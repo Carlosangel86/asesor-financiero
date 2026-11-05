@@ -1246,7 +1246,7 @@ function renderCatalog(){
 
         const imgSrc = resolveProductImage(p);
         const imgTag = imgSrc 
-            ? `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center relative shadow-sm">
+            ? `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
                    <img src="${imgSrc}" alt="${escapeHtml(p.name)}" loading="lazy" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i data-lucide=&quot;package&quot; class=&quot;w-5 h-5 text-slate-500&quot;></i>';">
                </div>`
             : `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center text-slate-500"><i data-lucide="package" class="w-5 h-5"></i></div>`;
@@ -1359,7 +1359,12 @@ function handleProductInputKeydown(type, e) {
 function openProductDropdown(type) {
     const list = document.getElementById(`${type}-dropdown-list`);
     const chevron = document.getElementById(`${type}-chevron-icon`);
+    const wrap = document.getElementById(`${type}-combobox-wrap`);
+    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : null;
     if (!list) return;
+
+    if (wrap) wrap.style.zIndex = '50';
+    if (sec) sec.style.zIndex = '50';
 
     filterProductDropdown(type);
     list.classList.remove('hidden');
@@ -1372,8 +1377,12 @@ function openProductDropdown(type) {
 function closeProductDropdown(type) {
     const list = document.getElementById(`${type}-dropdown-list`);
     const chevron = document.getElementById(`${type}-chevron-icon`);
+    const wrap = document.getElementById(`${type}-combobox-wrap`);
+    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : null;
     if (list) list.classList.add('hidden');
     if (chevron) chevron.style.transform = 'rotate(0deg)';
+    if (wrap) wrap.style.zIndex = '';
+    if (sec) sec.style.zIndex = '';
 }
 
 function clearProductSelection(type, event) {
