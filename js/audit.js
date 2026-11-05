@@ -15,7 +15,9 @@ function logActivity(action, details, level = 'info'){
     };
     activityLog.unshift(entry);
     if(activityLog.length > 200) activityLog = activityLog.slice(0, 200);
-    localStorage.setItem('cfo_activity_log', JSON.stringify(activityLog));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveActivityLog(activityLog).catch(console.warn);
+    }
     renderAuditLog();
 }
 
@@ -26,7 +28,9 @@ function clearAuditLog(){
     }
     if(confirm('¿Deseas vaciar la bitácora de auditoría?')){
         activityLog = [];
-        localStorage.setItem('cfo_activity_log', JSON.stringify(activityLog));
+        if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveActivityLog(activityLog).catch(console.warn);
+    }
         logActivity('Bitácora Vaciada', 'El administrador reinició el historial de auditoría.', 'warn');
     }
 }

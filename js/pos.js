@@ -903,32 +903,87 @@ const REFACCIONES_CATALOG = [
         "created":  "2026-10-14T09:40:00.000Z"
     }
 ];
-let catalog = JSON.parse(localStorage.getItem('pos_catalog') || 'null');
-if(!catalog || catalog.length === 0 || !catalog.some(p => p.id && p.id.startsWith('ref_'))){
-    catalog = JSON.parse(JSON.stringify(REFACCIONES_CATALOG));
-    localStorage.setItem('pos_catalog', JSON.stringify(catalog));
-}
+let catalog = JSON.parse(JSON.stringify(REFACCIONES_CATALOG));
 catalog.forEach(p => { if(p.stock === undefined || p.stock === null) p.stock = 20; });
+let salesLog = [];
+let expenses = [];
+let ticket = [];
+let posChart;
 
-function reloadRefaccionesCatalog(){
-    if(confirm('¿Recargar el catálogo con las 100 refacciones completas e inventario inicial?')){
+async function initPosData(){
+    if (!window.FirebaseService) {
+        await new Promise(r => {
+            window.addEventListener('firebase-initialized', r, { once: true });
+            setTimeout(r, 1500);
+        });
+    }
+
+    try {
+        if (window.FirebaseService && window.FirebaseService.products) {
+            await window.FirebaseService.products.seedIfEmpty(REFACCIONES_CATALOG);
+            const cloudCatalog = await window.FirebaseService.products.getAll();
+            if (cloudCatalog && cloudCatalog.length > 0) {
+                catalog = cloudCatalog;
+            }
+            // Suscripción reactiva a cambios en catálogo
+            window.FirebaseService.products.subscribe((updated) => {
+                if (updated && updated.length > 0) {
+                    catalog = updated;
+                    renderCatalog();
+                    updateProductSelect();
+                    if (typeof renderAlmacenDashboard === 'function') renderAlmacenDashboard();
+                }
+            });
+        }
+
+        if (window.FirebaseService && window.FirebaseService.sales) {
+            const cloudSales = await window.FirebaseService.sales.getAll(300);
+            if (cloudSales) {
+                salesLog = cloudSales;
+            }
+            // Suscripción reactiva a ventas
+            window.FirebaseService.sales.subscribe((updated) => {
+                if (updated) {
+                    salesLog = updated;
+                    upPosSummary();
+                    upPosStats();
+                }
+            });
+        }
+
+        if (window.FirebaseService && window.FirebaseService.stats) {
+            const cloudExpenses = await window.FirebaseService.stats.getExpenses();
+            if (cloudExpenses) {
+                expenses = cloudExpenses;
+            }
+        }
+    } catch(e) {
+        console.error('[Error al sincronizar POS con Firestore]', e);
+    }
+
+    renderCatalog();
+    updateProductSelect();
+    upPosSummary();
+    upPosStats();
+}
+
+async function reloadRefaccionesCatalog(){
+    if(confirm('¿Recargar el catálogo con las 100 refacciones completas en Cloud Firestore?')){
         catalog = JSON.parse(JSON.stringify(REFACCIONES_CATALOG));
-        localStorage.setItem('pos_catalog', JSON.stringify(catalog));
+        if (window.FirebaseService && window.FirebaseService.products) {
+            await window.FirebaseService.products.seedIfEmpty(REFACCIONES_CATALOG);
+        }
         renderCatalog();
         updateProductSelect();
         onSellProductChange();
-        alert('✓ Se cargaron las 100 refacciones al inventario.');
+        showGlobalToast('✓ Catálogo de 100 refacciones sincronizado con Firestore.', 'success');
     }
 }
-let salesLog=JSON.parse(localStorage.getItem('pos_sales')||'[]');
-let expenses=JSON.parse(localStorage.getItem('pos_expenses')||'[]');
-let ticket=[];
-let posChart;
 
 function initPosChart(){if(posChart)posChart.destroy();posChart=new Chart(document.getElementById('cPosBars'),{type:'bar',data:{labels:[],datasets:[{label:'Ventas ($)',data:[],backgroundColor:'rgba(16,185,129,.55)',borderRadius:8,borderSkipped:false},{label:'Costo ($)',data:[],backgroundColor:'rgba(244,63,94,.35)',borderRadius:8,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{ticks:{callback:v=>'$'+v},grid:{color:'rgba(51,65,85,.3)'},border:{display:false}},y:{ticks:{font:{size:10}},grid:{display:false},border:{display:false}}}}});}
 initPosChart();
 
-function addProduct(){
+async function addProduct(){
     if(!hasPermission('catalog.edit')){
         showAccessDeniedModal('Solo el Administrador tiene autorización para dar de alta nuevos productos en el catálogo.');
         return;
@@ -939,35 +994,38 @@ function addProduct(){
     const stockInput=parseInt(document.getElementById('cat-stock').value);
     if(!name||isNaN(price)||isNaN(cost)){alert('Completa los campos de nombre, precio y costo.');return;}
     const stock = isNaN(stockInput) || stockInput < 0 ? 0 : stockInput;
-    catalog.push({id:'p_'+Date.now(),name,price,cost,stock,category:'General',created:new Date().toISOString()});
-    localStorage.setItem('pos_catalog',JSON.stringify(catalog));
-    logActivity('Producto Creado', `Producto "${name}" agregado al catálogo por @${currentUser ? currentUser.username : 'sistema'} ($${price})`, 'success');
+    const newProd = {id:'p_'+Date.now(),name,price,cost,stock,category:'General',created:new Date().toISOString()};
+    catalog.push(newProd);
+    if (window.FirebaseService && window.FirebaseService.products) {
+        await window.FirebaseService.products.save(newProd);
+    }
+    logActivity('Producto Creado', `Producto "${name}" agregado al catálogo en Firestore ($${price})`, 'success');
     document.getElementById('cat-name').value='';document.getElementById('cat-price').value='';document.getElementById('cat-cost').value='';
     document.getElementById('cat-stock').value='20';
     renderCatalog();
     updateProductSelect();
+    showGlobalToast(`✓ Producto "${name}" guardado en Cloud Firestore`, 'success');
 }
 
-function removeProduct(id){
+async function removeProduct(id){
     if(!hasPermission('catalog.delete') && (!currentUser || currentUser.role !== 'admin')){
         showAccessDeniedModal('Acceso Restringido: Los usuarios de tipo Almacén no tienen permitido eliminar productos. Solo los Administradores cuentan con autorización para realizar eliminaciones en el catálogo.');
-        if(currentUser){
-            logActivity('Intento No Autorizado', `El usuario "${currentUser.username}" (${currentUser.role}) intentó eliminar el producto ID "${id}" sin permisos de Administrador.`, 'danger');
-        }
         return;
     }
-    if(confirm('¿Eliminar este producto del catálogo e inventario? Esta acción solo está autorizada para Administradores.')){
+    if(confirm('¿Eliminar este producto del catálogo en Firestore?')){
         const prod = catalog.find(p => p.id === id);
         catalog=catalog.filter(p=>p.id!==id);
-        localStorage.setItem('pos_catalog',JSON.stringify(catalog));
-        logActivity('Producto Eliminado', `Producto "${prod ? prod.name : id}" eliminado del catálogo por Administrador @${currentUser ? currentUser.username : 'sistema'}`, 'danger');
+        if (window.FirebaseService && window.FirebaseService.products) {
+            await window.FirebaseService.products.delete(id);
+        }
+        logActivity('Producto Eliminado', `Producto "${prod ? prod.name : id}" eliminado del catálogo en Firestore.`, 'danger');
         renderCatalog();
         updateProductSelect();
-        showGlobalToast(`✓ Producto "${prod ? prod.name : id}" eliminado del catálogo.`, 'info');
+        showGlobalToast(`✓ Producto eliminado de Cloud Firestore.`, 'info');
     }
 }
 
-function addStockToProduct(){
+async function addStockToProduct(){
     if(!hasPermission('inventory.adjust')){
         showAccessDeniedModal('Solo un Supervisor o Administrador puede reabastecer inventario.');
         return;
@@ -979,16 +1037,18 @@ function addStockToProduct(){
     const prod = catalog.find(p => p.id === pid);
     if(!prod) return;
     prod.stock = (prod.stock || 0) + qty;
-    localStorage.setItem('pos_catalog', JSON.stringify(catalog));
-    logActivity('Stock Reabastecido', `Se sumaron ${qty} u. al producto "${prod.name}" (Stock actual: ${prod.stock} u.)`, 'info');
+    if (window.FirebaseService && window.FirebaseService.products) {
+        await window.FirebaseService.products.updateStock(pid, prod.stock);
+    }
+    logActivity('Stock Reabastecido', `Se sumaron ${qty} u. al producto "${prod.name}" en Firestore.`, 'info');
     document.getElementById('restock-qty').value = '10';
     renderCatalog();
     updateProductSelect();
     onSellProductChange();
-    alert(`✓ Se agregaron ${qty} unidades a "${prod.name}". Nuevo stock: ${prod.stock} u.`);
+    showGlobalToast(`✓ Se agregaron ${qty} unidades a "${prod.name}" (Firestore).`, 'success');
 }
 
-function quickAddStock(id, amount){
+async function quickAddStock(id, amount){
     if(!hasPermission('inventory.adjust')){
         showAccessDeniedModal('Solo un Supervisor o Administrador puede modificar existencias de inventario.');
         return;
@@ -1003,8 +1063,10 @@ function quickAddStock(id, amount){
     }
     if(isNaN(addQty) || addQty <= 0){ alert('Cantidad inválida.'); return; }
     prod.stock = (prod.stock || 0) + addQty;
-    localStorage.setItem('pos_catalog', JSON.stringify(catalog));
-    logActivity('Stock Reabastecido', `Reabastecimiento rápido de ${addQty} u. en "${prod.name}" (Total: ${prod.stock} u.)`, 'info');
+    if (window.FirebaseService && window.FirebaseService.products) {
+        await window.FirebaseService.products.updateStock(id, prod.stock);
+    }
+    logActivity('Stock Reabastecido', `Reabastecimiento rápido de ${addQty} u. en "${prod.name}" en Firestore.`, 'info');
     renderCatalog();
     updateProductSelect();
     onSellProductChange();
@@ -1857,7 +1919,12 @@ function closeSale(){
             prod.stock = Math.max(0, (prod.stock || 0) - it.qty);
         }
     });
-    localStorage.setItem('pos_catalog', JSON.stringify(catalog));
+    if (window.FirebaseService && window.FirebaseService.products) {
+        for (const it of ticket) {
+            const pr = catalog.find(p => p.id === it.id);
+            if (pr) window.FirebaseService.products.updateStock(it.id, pr.stock).catch(console.warn);
+        }
+    }
 
     // Validar turno de caja antes de registrar (o auto-iniciar si no hay)
     if(!currentShift || currentShift.status !== 'open'){
@@ -1896,8 +1963,10 @@ function closeSale(){
 
     logActivity('Venta Registrada', `Venta cobrada por ${fmt(total)} (${paymentData.label}) por @${sale.cashierUsername}`, 'success');
 
-    salesLog.push(sale);
-    localStorage.setItem('pos_sales',JSON.stringify(salesLog));
+    salesLog.unshift(sale);
+    if (window.FirebaseService && window.FirebaseService.sales) {
+        window.FirebaseService.sales.create(sale).catch(console.warn);
+    }
     const justCreatedSaleId = sale.id;
 
     // Reset ticket & inputs

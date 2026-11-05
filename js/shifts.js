@@ -59,7 +59,9 @@ function confirmOpenShift(){
         initialCashFloat: amount,
         status: 'open'
     };
-    localStorage.setItem('pos_current_shift', JSON.stringify(currentShift));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCurrentShift(currentShift).catch(console.warn);
+    }
     logActivity('Turno Abierto', `Fondo inicial: ${fmt(amount)} por @${currentShift.cashierUsername}`, 'success');
     closeShiftOpenModal();
     updateShiftUI();
@@ -172,8 +174,10 @@ function confirmCloseShiftZ(){
     currentShift.status = 'closed';
 
     shiftsHistory.push(currentShift);
-    localStorage.setItem('pos_shifts_history', JSON.stringify(shiftsHistory));
-    localStorage.removeItem('pos_current_shift');
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveShiftsHistory(shiftsHistory).catch(console.warn);
+        window.FirebaseService.stats.saveCurrentShift(null).catch(console.warn);
+    }
 
     logActivity('Cierre de Turno (Corte Z)', `Turno cerrado con ${fmt(physical)} en caja. Discrepancia: ${fmt(discrepancy)}`, Math.abs(discrepancy) < 1 ? 'success' : 'warn');
 

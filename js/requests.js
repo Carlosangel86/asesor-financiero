@@ -151,7 +151,9 @@ function executeCancelModalSubmit(){
         };
 
         cancelRequests.unshift(req);
-        localStorage.setItem('cfo_cancel_reqs', JSON.stringify(cancelRequests));
+        if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+    }
 
         logActivity('Solicitud Cancelación', `Cajero @${req.cashierUsername} solicitó cancelar venta ${sale.id} ($${sale.total}). Motivo: ${reason}`, 'warn');
         closeCancelModal();
@@ -190,7 +192,12 @@ function cancelSaleDirect(saleId, reason){
                 prod.stock = (prod.stock || 0) + it.qty;
             }
         });
-        localStorage.setItem('pos_catalog', JSON.stringify(catalog));
+        if (window.FirebaseService && window.FirebaseService.products) {
+        for (const it of sale.items) {
+            const pr = catalog.find(p => p.id === it.id);
+            if (pr) window.FirebaseService.products.updateStock(it.id, pr.stock).catch(console.warn);
+        }
+    }
     }
 
     // 2. Marcar venta como 'cancelled' (NUNCA BORRAR DEL ARRAY)
@@ -198,7 +205,9 @@ function cancelSaleDirect(saleId, reason){
     sale.cancelReason = reason || 'Cancelación directa por supervisor/admin';
     sale.cancelledBy = `${currentUser.name} (@${currentUser.username} - ${currentUser.role})`;
     sale.cancelledAt = new Date().toISOString();
-    localStorage.setItem('pos_sales', JSON.stringify(salesLog));
+    if (window.FirebaseService && window.FirebaseService.sales) {
+        window.FirebaseService.sales.cancel(saleId, reason, currentUser ? currentUser.name : 'Supervisor').catch(console.warn);
+    }
 
     // 3. Si había solicitud pendiente para esta venta, resolverla
     const pendingReq = cancelRequests.find(r => r.saleId === saleId && r.status === 'pending');
@@ -207,7 +216,9 @@ function cancelSaleDirect(saleId, reason){
         pendingReq.resolvedBy = `${currentUser.name} (@${currentUser.username})`;
         pendingReq.resolvedAt = new Date().toISOString();
         pendingReq.notes = 'Aprobada vía anulación directa';
-        localStorage.setItem('cfo_cancel_reqs', JSON.stringify(cancelRequests));
+        if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+    }
     }
 
     logActivity('Venta Cancelada Directamente', `Venta ${sale.id} por $${sale.total} fue anulada por ${currentUser.username}. Motivo: ${reason}`, 'danger');
@@ -238,7 +249,9 @@ function approveCancelRequest(reqId){
         alert('No se encontró la venta vinculada a esta solicitud.');
         req.status = 'rejected';
         req.notes = 'Venta no existente';
-        localStorage.setItem('cfo_cancel_reqs', JSON.stringify(cancelRequests));
+        if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+    }
         renderCancelRequests();
         return;
     }
@@ -252,21 +265,30 @@ function approveCancelRequest(reqId){
                     prod.stock = (prod.stock || 0) + it.qty;
                 }
             });
-            localStorage.setItem('pos_catalog', JSON.stringify(catalog));
+            if (window.FirebaseService && window.FirebaseService.products) {
+        for (const it of sale.items) {
+            const pr = catalog.find(p => p.id === it.id);
+            if (pr) window.FirebaseService.products.updateStock(it.id, pr.stock).catch(console.warn);
+        }
+    }
         }
 
         sale.status = 'cancelled';
         sale.cancelReason = req.reason;
         sale.cancelledBy = `${currentUser.name} (@${currentUser.username} - ${currentUser.role})`;
         sale.cancelledAt = new Date().toISOString();
-        localStorage.setItem('pos_sales', JSON.stringify(salesLog));
+        if (window.FirebaseService && window.FirebaseService.sales) {
+        window.FirebaseService.sales.cancel(saleId, reason, currentUser ? currentUser.name : 'Supervisor').catch(console.warn);
+    }
     }
 
     req.status = 'approved';
     req.resolvedBy = `${currentUser.name} (@${currentUser.username})`;
     req.resolvedAt = new Date().toISOString();
     req.notes = 'Aprobada en panel de control';
-    localStorage.setItem('cfo_cancel_reqs', JSON.stringify(cancelRequests));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+    }
 
     logActivity('Solicitud Aprobada', `Cancelación autorizada para venta ${sale.id} ($${sale.total}) solicitada por @${req.cashierUsername}`, 'success');
     alert(`✓ Solicitud aprobada. Venta ${sale.id} anulada e inventario reintegrado.`);
@@ -295,7 +317,9 @@ function rejectCancelRequest(reqId, notes){
     req.resolvedBy = `${currentUser.name} (@${currentUser.username})`;
     req.resolvedAt = new Date().toISOString();
     req.notes = notes || 'Rechazada por el evaluador';
-    localStorage.setItem('cfo_cancel_reqs', JSON.stringify(cancelRequests));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+    }
 
     logActivity('Solicitud Rechazada', `Solicitud ${req.id} de @${req.cashierUsername} fue rechazada. Motivo: ${notes}`, 'warn');
     alert(`✓ Solicitud de cancelación rechazada. La venta permanece completada.`);

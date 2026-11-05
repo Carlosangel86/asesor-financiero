@@ -284,9 +284,27 @@ async function syncFromPos(){
 
 
 
-// ===== INICIALIZACIÓN GLOBAL DEL SISTEMA =====
-function startApp() {
-    initAuthAndUsers();
+// ===== INICIALIZACIÓN GLOBAL DEL SISTEMA CON FIREBASE =====
+async function startApp() {
+    if (window.FirebaseService) {
+        await initAuthAndUsers();
+        if (typeof initPosData === 'function') await initPosData();
+    } else {
+        window.addEventListener('firebase-initialized', async () => {
+            await initAuthAndUsers();
+            if (typeof initPosData === 'function') await initPosData();
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+        }, { once: true });
+        // Fallback por si el evento ya se ejecutó
+        setTimeout(async () => {
+            if (!currentUser) {
+                await initAuthAndUsers();
+                if (typeof initPosData === 'function') await initPosData();
+            }
+        }, 1800);
+    }
     if (window.lucide && typeof lucide.createIcons === 'function') {
         lucide.createIcons();
     }
