@@ -23,8 +23,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,21 +39,22 @@ jobs:
         id: deploy
         run: |
           set +e
-          echo "Iniciando despliegue Firebase..."
-          npx --yes firebase-tools deploy --only hosting --project asesor-financiero-83679 --debug > deploy.log 2>&1
+          echo "Iniciando despliegue en Firebase Hosting..."
+          npx --yes firebase-tools@13.29.1 deploy --only hosting --project asesor-financiero-83679 --debug > deploy.log 2>&1
           STATUS=$?
-          
-          # Extraer el error especifico
-          ERR_LINE=$(grep -i "error:" deploy.log | tail -n 5 | tr '\n' ' -- ')
-          echo "::error title=Firebase CLI Result::Exit Code $STATUS | $ERR_LINE"
-          
-          # Guardar log en rama debug para inspeccion completa
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B debug-deploy-log
-          git add deploy.log
-          git commit -m "chore(debug): log de despliegue [skip ci]" || true
-          git push origin debug-deploy-log --force || true
-          
           cat deploy.log
+          
+          if [ $STATUS -eq 0 ]; then
+            echo "::notice title=Despliegue Exitoso::Firebase Hosting ha sido desplegado exitosamente."
+            echo "### ✅ Despliegue Exitoso en Firebase Hosting" >> $GITHUB_STEP_SUMMARY
+            echo "- 🌐 **URL Principal:** [https://asesor-financiero-83679.web.app](https://asesor-financiero-83679.web.app)" >> $GITHUB_STEP_SUMMARY
+            echo "- 🌐 **URL Secundaria:** [https://asesor-financiero-83679.firebaseapp.com](https://asesor-financiero-83679.firebaseapp.com)" >> $GITHUB_STEP_SUMMARY
+          else
+            ERR_LINE=$(grep -i "error:" deploy.log | tail -n 5 | tr '\n' ' -- ')
+            echo "::error title=Firebase CLI Result::Exit Code $STATUS | $ERR_LINE"
+            echo "### ❌ Error en el Despliegue de Firebase Hosting" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 deploy.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
           exit $STATUS
