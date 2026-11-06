@@ -300,6 +300,10 @@ function renderInvoiceResult(invoice) {
     }
 
     if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+    setTimeout(() => {
+        const resCard = document.getElementById('invoice-result-card');
+        if (resCard) resCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
 }
 
 function showBillingFormForSale(sale) {
@@ -355,6 +359,10 @@ async function lookupAndLoadSale(token, folio) {
             setLookupStatus(`Ticket #${sale.id} verificado correctamente. Completa tus datos fiscales para generar tu factura simulada.`, 'success');
             showBillingFormForSale(sale);
         }
+        setTimeout(() => {
+            const ws = document.getElementById('billing-workspace');
+            if (ws) ws.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 120);
     } catch (e) {
         console.error('[Facturación Lookup Error]', e);
         setLookupStatus(e.message || 'Error al consultar la venta.', 'error');

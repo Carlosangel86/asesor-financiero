@@ -12,20 +12,47 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" type="image/png" href="img/logo.png">
 <style>
+    html, body {
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        scroll-behavior: smooth;
+    }
     body {
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
         background-color: #020617;
         color: #f8fafc;
-        min-height: 100vh;
+        margin: 0;
+    }
+    /* Barra de desplazamiento vertical moderna, visible y siempre utilizable */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 5px;
+        border: 2px solid #020617;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #0ea5e9;
+    }
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: #334155 #020617;
     }
     /* Modern Web Guidance: validate-input-after-interaction (:user-invalid + fallback class) */
     .billing-input {
         width: 100%;
         background: rgba(15, 23, 42, 0.9);
         border: 1px solid rgba(51, 65, 85, 0.85);
-        border-radius: 0.75rem;
-        padding: 0.65rem 0.85rem;
-        font-size: 0.875rem;
+        border-radius: 0.65rem;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.8125rem;
         color: #f8fafc;
         outline: none;
         transition: border-color 0.2s, box-shadow 0.2s;
@@ -46,7 +73,7 @@
         display: none;
         color: #fda4af;
         font-size: 0.75rem;
-        margin-top: 0.35rem;
+        margin-top: 0.25rem;
         line-height: 1.35;
     }
     .field-error-msg.visible {
@@ -56,7 +83,7 @@
     }
 </style>
 </head>
-<body class="flex flex-col min-h-screen overflow-x-hidden">
+<body class="flex flex-col min-h-screen bg-[#020617] text-slate-100 antialiased overflow-y-auto overflow-x-hidden">
 
 <!-- BANNER OBLIGATORIO DE SIMULACIÓN FISCAL -->
 <div class="w-full bg-rose-950/95 border-b border-rose-500/40 px-4 py-2 text-center sticky top-0 z-50 backdrop-blur-md">
@@ -91,13 +118,13 @@
 </header>
 
 <!-- CONTENIDO PRINCIPAL -->
-<main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+<main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4">
 
     <!-- PASO 1: IDENTIFICACIÓN DEL TICKET DE COMPRA POR TOKEN / FOLIO -->
-    <section class="glass rounded-2xl p-5 border border-slate-800/90 shadow-xl">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+    <section class="glass rounded-2xl p-4 sm:p-5 border border-slate-800/90 shadow-xl">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-2.5">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/30 text-sky-400 flex items-center justify-center font-bold text-xs">1</div>
+                <div class="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-500/30 text-sky-400 flex items-center justify-center font-bold text-xs">1</div>
                 <div>
                     <h2 class="text-sm sm:text-base font-bold text-white">Localizar Ticket de Venta</h2>
                     <p class="text-xs text-slate-400">Ingresa el Token de Autofacturación o el Folio impreso debajo del código QR de tu ticket.</p>
@@ -110,8 +137,8 @@
 
         <form id="ticket-lookup-form" onsubmit="handleTicketLookup(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <div class="sm:col-span-5">
-                <label for="lookup-token" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Token de Autofacturación</label>
-                <p id="hint-lookup-token" class="text-[11px] text-slate-400 mb-1.5">Ejemplo: TK-8F4A-92C1-7B3E (impreso en tu ticket)</p>
+                <label for="lookup-token" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-0.5">Token de Autofacturación</label>
+                <p id="hint-lookup-token" class="text-[10.5px] text-slate-400 mb-1">Ejemplo: TK-8F4A-92C1-7B3E (impreso en tu ticket)</p>
                 <input id="lookup-token"
                        type="text"
                        aria-describedby="hint-lookup-token"
@@ -122,8 +149,8 @@
                        class="billing-input mono uppercase">
             </div>
             <div class="sm:col-span-4">
-                <label for="lookup-folio" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Folio de Venta (Opcional)</label>
-                <p id="hint-lookup-folio" class="text-[11px] text-slate-400 mb-1.5">Ejemplo: s_1775439000000</p>
+                <label for="lookup-folio" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-0.5">Folio de Venta (Opcional)</label>
+                <p id="hint-lookup-folio" class="text-[10.5px] text-slate-400 mb-1">Ejemplo: s_1775439000000</p>
                 <input id="lookup-folio"
                        type="text"
                        aria-describedby="hint-lookup-folio"
@@ -133,43 +160,43 @@
                        class="billing-input mono">
             </div>
             <div class="sm:col-span-3">
-                <button type="submit" id="btn-lookup-ticket" class="pos-btn bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm py-2.5 px-4 w-full justify-center shadow-lg shadow-sky-600/25 flex items-center gap-1.5">
-                    <i data-lucide="search" class="w-4 h-4"></i>
+                <button type="submit" id="btn-lookup-ticket" class="pos-btn bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs py-2.5 px-4 w-full justify-center shadow-lg shadow-sky-600/25 flex items-center gap-1.5">
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i>
                     <span>Buscar Ticket</span>
                 </button>
             </div>
         </form>
 
         <!-- Mensaje de estado de búsqueda -->
-        <div id="lookup-status-box" class="hidden mt-3 p-3 rounded-xl text-xs flex items-center gap-2"></div>
+        <div id="lookup-status-box" class="hidden mt-2.5 p-2.5 rounded-xl text-xs flex items-center gap-2"></div>
     </section>
 
     <!-- CONTENEDOR DINÁMICO: RESUMEN DE VENTA + FORMULARIO O FACTURA EMITIDA -->
-    <div id="billing-workspace" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div id="billing-workspace" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
 
         <!-- COLUMNA IZQUIERDA (5 cols): RESUMEN INMUTABLE DE LA VENTA ORIGINAL -->
-        <aside class="lg:col-span-5 space-y-4">
-            <div class="glass rounded-2xl p-5 border border-slate-800/90">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+        <aside class="lg:col-span-5 space-y-4 lg:sticky lg:top-14 self-start">
+            <div class="glass rounded-2xl p-4 sm:p-5 border border-slate-800/90 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5">
                     <div class="flex items-center gap-2">
                         <i data-lucide="receipt" class="w-4 h-4 text-emerald-400"></i>
-                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Resumen del Ticket</h3>
+                        <h3 class="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Resumen del Ticket</h3>
                     </div>
-                    <span id="sale-status-pill" class="pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">DISPONIBLE</span>
+                    <span id="sale-status-pill" class="pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold">DISPONIBLE</span>
                 </div>
 
-                <div class="space-y-1.5 text-xs text-slate-300 mb-4 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                    <div class="flex justify-between"><span class="text-slate-400">Folio de Venta:</span><b class="mono text-white" id="summary-sale-id">—</b></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Token Seguridad:</span><b class="mono text-sky-400" id="summary-sale-token">—</b></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Fecha de Compra:</span><span class="mono" id="summary-sale-date">—</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Forma de Pago (SAT):</span><span class="font-medium text-emerald-300" id="summary-sale-payment">—</span></div>
+                <div class="space-y-1 text-xs text-slate-300 mb-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    <div class="flex justify-between"><span class="text-slate-400">Folio de Venta:</span><b class="mono text-white text-[11px]" id="summary-sale-id">—</b></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Token Seguridad:</span><b class="mono text-sky-400 text-[11px]" id="summary-sale-token">—</b></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Fecha de Compra:</span><span class="mono text-[11px]" id="summary-sale-date">—</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Forma de Pago (SAT):</span><span class="font-medium text-emerald-300 text-[11px]" id="summary-sale-payment">—</span></div>
                 </div>
 
-                <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Conceptos de la Operación</h4>
-                <div id="summary-items-list" class="space-y-2 max-h-64 overflow-y-auto pr-1 mb-4 divide-y divide-slate-800/60"></div>
+                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Conceptos de la Operación</h4>
+                <div id="summary-items-list" class="space-y-1.5 max-h-48 sm:max-h-56 overflow-y-auto pr-1 mb-3 divide-y divide-slate-800/60"></div>
 
                 <!-- Desglose de Importes Históricos -->
-                <div class="border-t border-slate-800 pt-3 space-y-1.5 text-xs">
+                <div class="border-t border-slate-800 pt-2.5 space-y-1 text-xs">
                     <div class="flex justify-between text-slate-300">
                         <span>Subtotal (Base Gravable):</span>
                         <span class="mono font-semibold" id="summary-subtotal">$0.00</span>
@@ -178,11 +205,11 @@
                         <span id="summary-tax-label">IVA Trasladado (16%):</span>
                         <span class="mono font-semibold text-sky-300" id="summary-tax">$0.00</span>
                     </div>
-                    <div class="flex justify-between text-base font-bold text-white pt-1.5 border-t border-slate-800/80">
+                    <div class="flex justify-between text-sm sm:text-base font-bold text-white pt-1 border-t border-slate-800/80">
                         <span>Total de la Venta:</span>
                         <span class="mono text-emerald-400" id="summary-total">$0.00</span>
                     </div>
-                    <div class="text-[10px] text-slate-400 italic pt-1" id="summary-total-letras"></div>
+                    <div class="text-[9.5px] text-slate-400 italic pt-0.5" id="summary-total-letras"></div>
                 </div>
             </div>
         </aside>
@@ -191,34 +218,34 @@
         <section class="lg:col-span-7">
 
             <!-- VISTA A: FORMULARIO DE CAPTURA DE DATOS FISCALES (CFDI 4.0) -->
-            <div id="billing-form-card" class="glass rounded-2xl p-5 sm:p-6 border border-slate-800/90 shadow-xl">
-                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3.5 mb-4">
+            <div id="billing-form-card" class="glass rounded-2xl p-4 sm:p-5 border border-slate-800/90 shadow-xl">
+                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3 mb-3.5">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-xs">2</div>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-xs">2</div>
                         <div>
-                            <h2 class="text-sm sm:text-base font-bold text-white">Captura de Datos Fiscales del Receptor</h2>
-                            <p class="text-xs text-slate-400">Validación de estructura conforme al estándar CFDI 4.0.</p>
+                            <h2 class="text-sm sm:text-base font-bold text-white">Datos Fiscales del Receptor</h2>
+                            <p class="text-[11px] text-slate-400">Validación de estructura conforme al estándar CFDI 4.0.</p>
                         </div>
                     </div>
-                    <button type="button" onclick="fillPublicoEnGeneral()" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg px-2.5 py-1.5 font-semibold transition flex items-center gap-1" title="Autorrellenar con RFC Genérico Nacional XAXX010101000">
-                        <i data-lucide="user-check" class="w-3.5 h-3.5"></i>Público en General
+                    <button type="button" onclick="fillPublicoEnGeneral()" class="text-[10.5px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg px-2.5 py-1 font-semibold transition flex items-center gap-1" title="Autorrellenar con RFC Genérico Nacional XAXX010101000">
+                        <i data-lucide="user-check" class="w-3 h-3"></i>Público en General
                     </button>
                 </div>
 
                 <!-- Caja de error general del formulario -->
-                <div id="billing-form-alert" class="hidden mb-4 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2.5" role="alert">
+                <div id="billing-form-alert" class="hidden mb-3 p-3 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs flex items-start gap-2.5" role="alert">
                     <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0 mt-0.5"></i>
                     <div id="billing-form-alert-text" class="leading-relaxed"></div>
                 </div>
 
-                <form id="cfdi-receptor-form" onsubmit="handleGenerateInvoice(event)" novalidate class="space-y-4">
+                <form id="cfdi-receptor-form" onsubmit="handleGenerateInvoice(event)" novalidate class="space-y-3.5">
                     <!-- 1. RFC -->
                     <div>
                         <div class="flex items-center justify-between">
                             <label for="fiscal-rfc" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">RFC del Receptor <span class="text-rose-400">*</span></label>
-                            <span id="rfc-person-type-badge" class="hidden pill bg-slate-800 text-sky-300 border border-slate-700 text-[10px] font-mono"></span>
+                            <span id="rfc-person-type-badge" class="hidden pill bg-slate-800 text-sky-300 border border-slate-700 text-[9.5px] font-mono"></span>
                         </div>
-                        <p id="hint-fiscal-rfc" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">12 caracteres para Persona Moral o 13 caracteres para Persona Física (sin espacios ni guiones).</p>
+                        <p id="hint-fiscal-rfc" class="text-[10.5px] text-slate-400 mt-0.5 mb-1">12 caracteres para Persona Moral o 13 para Persona Física (sin espacios ni guiones).</p>
                         <input id="fiscal-rfc"
                                name="rfc"
                                type="text"
@@ -240,14 +267,14 @@
                     <!-- 2. Nombre o Razón Social -->
                     <div>
                         <label for="fiscal-nombre" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Nombre Completo o Razón Social <span class="text-rose-400">*</span></label>
-                        <p id="hint-fiscal-nombre" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">En mayúsculas tal como aparece en tu Constancia de Situación Fiscal.</p>
+                        <p id="hint-fiscal-nombre" class="text-[10.5px] text-slate-400 mt-0.5 mb-1">En mayúsculas exactamente como en tu Constancia de Situación Fiscal.</p>
                         <input id="fiscal-nombre"
                                name="nombre"
                                type="text"
                                required
                                minlength="3"
                                autocapitalize="characters"
-                                autocomplete="organization"
+                               autocomplete="organization"
                                aria-describedby="hint-fiscal-nombre err-fiscal-nombre"
                                placeholder="Ej. JUAN PÉREZ GARCÍA o COMERCIALIZADORA DEL CENTRO"
                                onblur="validateSingleFieldOnBlur('nombre')"
@@ -256,10 +283,10 @@
                     </div>
 
                     <!-- 3. Código Postal Fiscal y Correo Electrónico -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label for="fiscal-cp" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Código Postal Fiscal <span class="text-rose-400">*</span></label>
-                            <p id="hint-fiscal-cp" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">Exactamente 5 dígitos numéricos del domicilio fiscal.</p>
+                            <p id="hint-fiscal-cp" class="text-[10.5px] text-slate-400 mt-0.5 mb-1">Exactamente 5 dígitos de tu domicilio fiscal.</p>
                             <input id="fiscal-cp"
                                    name="codigoPostal"
                                    type="text"
@@ -278,7 +305,7 @@
 
                         <div>
                             <label for="fiscal-email" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Correo Electrónico <span class="text-slate-500 font-normal">(Opcional)</span></label>
-                            <p id="hint-fiscal-email" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">Para referencia en el comprobante generado.</p>
+                            <p id="hint-fiscal-email" class="text-[10.5px] text-slate-400 mt-0.5 mb-1">Para referencia en el comprobante generado.</p>
                             <input id="fiscal-email"
                                    name="email"
                                    type="email"
@@ -291,46 +318,47 @@
                         </div>
                     </div>
 
-                    <!-- 4. Régimen Fiscal -->
-                    <div>
-                        <label for="fiscal-regimen" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Régimen Fiscal del Receptor <span class="text-rose-400">*</span></label>
-                        <p id="hint-fiscal-regimen" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">Catálogo oficial SAT c_RegimenFiscal filtrado según tu tipo de RFC.</p>
-                        <select id="fiscal-regimen"
-                                name="regimenFiscal"
-                                required
-                                aria-describedby="hint-fiscal-regimen err-fiscal-regimen"
-                                onchange="onRegimenChange()"
-                                onblur="validateSingleFieldOnBlur('regimenFiscal')"
-                                class="billing-input cursor-pointer">
-                            <option value="">— Selecciona un Régimen Fiscal —</option>
-                        </select>
-                        <div id="err-fiscal-regimen" class="field-error-msg" role="status" aria-live="polite"></div>
-                    </div>
-
-                    <!-- 5. Uso del CFDI -->
-                    <div>
-                        <label for="fiscal-uso" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Uso del CFDI <span class="text-rose-400">*</span></label>
-                        <p id="hint-fiscal-uso" class="text-[11px] text-slate-400 mt-0.5 mb-1.5">Catálogo SAT c_UsoCFDI compatible con el Régimen Fiscal seleccionado.</p>
-                        <select id="fiscal-uso"
-                                name="usoCfdi"
-                                required
-                                aria-describedby="hint-fiscal-uso err-fiscal-uso"
-                                onblur="validateSingleFieldOnBlur('usoCfdi')"
-                                class="billing-input cursor-pointer">
-                            <option value="">— Selecciona el Uso del CFDI —</option>
-                        </select>
-                        <div id="err-fiscal-uso" class="field-error-msg" role="status" aria-live="polite"></div>
-                    </div>
-
-                    <!-- Aviso de Simulación antes de emitir -->
-                    <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
-                        <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                    <!-- 4. Régimen Fiscal y 5. Uso del CFDI en columnas adaptativas -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <b>Aviso Importante:</b> Al generar este comprobante se bloqueará el ticket para evitar duplicidad de facturas. Los archivos PDF y XML generados incluirán la leyenda <b>"DOCUMENTO DE SIMULACIÓN - SIN VALIDEZ FISCAL"</b>.
+                            <label for="fiscal-regimen" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Régimen Fiscal <span class="text-rose-400">*</span></label>
+                            <p id="hint-fiscal-regimen" class="text-[10.5px] text-slate-400 mt-0.5 mb-1 truncate">Catálogo SAT c_RegimenFiscal.</p>
+                            <select id="fiscal-regimen"
+                                    name="regimenFiscal"
+                                    required
+                                    aria-describedby="hint-fiscal-regimen err-fiscal-regimen"
+                                    onchange="onRegimenChange()"
+                                    onblur="validateSingleFieldOnBlur('regimenFiscal')"
+                                    class="billing-input cursor-pointer">
+                                <option value="">— Selecciona Régimen —</option>
+                            </select>
+                            <div id="err-fiscal-regimen" class="field-error-msg" role="status" aria-live="polite"></div>
+                        </div>
+
+                        <div>
+                            <label for="fiscal-uso" class="block text-xs font-bold text-slate-200 uppercase tracking-wider">Uso del CFDI <span class="text-rose-400">*</span></label>
+                            <p id="hint-fiscal-uso" class="text-[10.5px] text-slate-400 mt-0.5 mb-1 truncate">Catálogo SAT compatible.</p>
+                            <select id="fiscal-uso"
+                                    name="usoCfdi"
+                                    required
+                                    aria-describedby="hint-fiscal-uso err-fiscal-uso"
+                                    onblur="validateSingleFieldOnBlur('usoCfdi')"
+                                    class="billing-input cursor-pointer">
+                                <option value="">— Selecciona Uso CFDI —</option>
+                            </select>
+                            <div id="err-fiscal-uso" class="field-error-msg" role="status" aria-live="polite"></div>
                         </div>
                     </div>
 
-                    <button type="submit" id="btn-emit-invoice" class="pos-btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm py-3 px-5 w-full justify-center shadow-lg shadow-emerald-600/25 flex items-center gap-2">
+                    <!-- Aviso de Simulación antes de emitir -->
+                    <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"></i>
+                        <div class="text-[11.5px] leading-relaxed">
+                            <b>Aviso Importante:</b> Al emitir este comprobante se bloqueará el ticket para evitar duplicidad. Los archivos PDF y XML incluirán la leyenda <b>"DOCUMENTO DE SIMULACIÓN - SIN VALIDEZ FISCAL"</b>.
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-emit-invoice" class="pos-btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm py-2.5 px-4 w-full justify-center shadow-lg shadow-emerald-600/25 flex items-center gap-2">
                         <i data-lucide="file-check-2" class="w-4 h-4"></i>
                         <span>Generar Comprobante Fiscal Simulado (PDF y XML)</span>
                     </button>
