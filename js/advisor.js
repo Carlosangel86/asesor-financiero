@@ -55,7 +55,26 @@ function initCharts(){
 }
 initCharts();
 
-function showAdvTab(t){['dash','ratios','back','amor'].forEach(n=>{const vn=document.getElementById('v-'+n);if(vn)vn.classList.toggle('hidden',n!==t);const b=document.getElementById('t-'+n);if(b){n===t?(b.classList.add('tab-on'),b.classList.remove('text-slate-500')):(b.classList.remove('tab-on'),b.classList.add('text-slate-500'));}});}
+function showAdvTab(t){
+    if (window.innerWidth < 1024 && typeof switchMobileAdvView === 'function') {
+        switchMobileAdvView('dash');
+    }
+    ['dash','ratios','back','amor'].forEach(n=>{
+        const vn=document.getElementById('v-'+n);
+        if(vn)vn.classList.toggle('hidden',n!==t);
+        const b=document.getElementById('t-'+n);
+        if(b){
+            if(n===t){
+                b.classList.add('tab-on');
+                b.classList.remove('text-slate-500');
+                try{b.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});}catch(e){}
+            }else{
+                b.classList.remove('tab-on');
+                b.classList.add('text-slate-500');
+            }
+        }
+    });
+}
 
 function setHints(a){const hEl=document.getElementById('hints');if(!hEl)return;hEl.innerHTML=a.map(h=>`<button onclick="useH(\`${h.t}\`)" class="whitespace-nowrap px-3 py-2 rounded-full bg-slate-800/70 hover:bg-slate-700 border border-slate-700/60 text-[11px] text-slate-300 transition shadow flex items-center gap-1.5 shrink-0"><i data-lucide="zap" class="w-3 h-3 text-sky-500"></i>${h.l}</button>`).join('');if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}
 function updateInitialHints(){

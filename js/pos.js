@@ -3253,6 +3253,10 @@ function showPosTab(t){
     const pvAnalista = document.getElementById('pv-analista-info');
     if(pvAnalista && currentUser.role !== 'analista') pvAnalista.classList.add('hidden');
 
+    if (window.innerWidth < 1024 && typeof switchMobilePosView === 'function') {
+        switchMobilePosView('ops');
+    }
+
     ['catalog','sell','expense','users'].forEach(n => {
         const el = document.getElementById('pv-' + n);
         if(el) el.classList.toggle('hidden', n !== t);
@@ -3261,6 +3265,7 @@ function showPosTab(t){
             if(n === t){
                 b.classList.add('tab-on');
                 b.classList.remove('text-slate-500');
+                try { b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch(e){}
             } else {
                 b.classList.remove('tab-on');
                 b.classList.add('text-slate-500');

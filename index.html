@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Procaña Motors — Plataforma Financiera & POS</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -56,7 +56,7 @@
         <div class="h-4 w-[1px] bg-slate-700/60 mx-1"></div>
         <div id="session-user-badge" class="flex items-center gap-1.5 sm:gap-2">
             <span class="text-slate-400 text-[11px] hidden md:inline">Usuario:</span>
-            <span id="session-user-name" class="font-semibold text-white text-[11.5px]">Sin Sesión</span>
+            <span id="session-user-name" class="font-semibold text-white text-[11.5px] truncate max-w-[90px] sm:max-w-none">Sin Sesión</span>
             <span id="session-role-pill" class="pill bg-slate-800 text-slate-500 border border-slate-700 font-bold text-[9px] uppercase">NO AUTENTICADO</span>
         </div>
     </div>
@@ -583,7 +583,7 @@
 <div class="absolute inset-0 opacity-[0.015] pointer-events-none" style="background-image:radial-gradient(#94a3b8 1px,transparent 1px);background-size:30px 30px"></div>
 
 <!-- Tarjetita en Esquina Superior Izquierda: Sucursal Matriz (Abre Ventana Flotante con Mapa) -->
-<div id="menu-card-location" onclick="openBranchModal()" class="absolute top-5 left-5 sm:top-6 sm:left-6 z-20 glass-light px-3.5 py-2 rounded-xl border border-slate-700/80 hover:border-emerald-500/50 cursor-pointer transition-all shadow-lg flex items-center gap-2.5 group fin" title="Clic para ver mapa y localización GPS">
+<div id="menu-card-location" onclick="openBranchModal()" class="static sm:absolute top-5 left-5 sm:top-6 sm:left-6 z-20 glass-light px-3.5 py-2 rounded-xl border border-slate-700/80 hover:border-emerald-500/50 cursor-pointer transition-all shadow-lg flex items-center gap-2.5 group fin mb-4 sm:mb-0 max-w-[90vw]" title="Clic para ver mapa y localización GPS">
     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30 shrink-0 group-hover:scale-105 transition">
         <i data-lucide="map-pin" class="w-4 h-4"></i>
     </div>
@@ -605,7 +605,7 @@
 <!-- 2 Tarjetas Principales del Menú -->
 <div class="flex flex-wrap gap-6 z-10 justify-center items-center max-w-4xl">
     <!-- Tarjeta 1: Asesoría Financiera -->
-    <div id="menu-card-advisor" class="menu-card glass-frosted w-72 fin transition-all" onclick="goTo('advisor')" style="animation-delay:.1s">
+    <div id="menu-card-advisor" class="menu-card glass-frosted w-full max-w-[280px] sm:w-72 fin transition-all" onclick="goTo('advisor')" style="animation-delay:.1s">
         <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-sky-600/25"><i data-lucide="message-square-text" class="text-white w-7 h-7"></i></div>
         <h2 class="text-lg font-bold text-white mb-2">Diagnóstico Financiero</h2>
         <p id="menu-adv-desc" class="text-slate-400 text-xs leading-relaxed">Valuación de negocio, análisis de crédito, simulación de escenarios y explicaciones con IA.</p><div id="menu-adv-role-badge" class="mt-2.5"></div>
@@ -613,7 +613,7 @@
     </div>
 
     <!-- Tarjeta 2: Punto de Venta -->
-    <div id="menu-card-pos" class="menu-card glass-frosted w-72 fin transition-all" onclick="goTo('pos')" style="animation-delay:.2s">
+    <div id="menu-card-pos" class="menu-card glass-frosted w-full max-w-[280px] sm:w-72 fin transition-all" onclick="goTo('pos')" style="animation-delay:.2s">
         <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-600/25"><i data-lucide="shopping-cart" class="text-white w-7 h-7"></i></div>
         <h2 class="text-lg font-bold text-white mb-2">Punto de Venta</h2>
         <p class="text-slate-400 text-xs leading-relaxed">Registra productos, ventas diarias y gastos. Historial completo y exportable.</p>
@@ -623,15 +623,27 @@
 </div>
 
 <!-- ===== MÓDULO: ASESORÍA FINANCIERA ===== -->
-<div id="view-advisor" class="flex-1 flex overflow-hidden hidden">
+<div id="view-advisor" class="flex-1 flex flex-col lg:flex-row overflow-hidden hidden">
+
+<!-- Selector Móvil: Chat Asesor vs Dashboard (< 1024px) -->
+<div class="lg:hidden flex items-center justify-center px-3 py-2 bg-slate-950/90 border-b border-slate-800/80 shrink-0 z-30">
+    <div class="grid grid-cols-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800 w-full max-w-sm gap-1 shadow-inner">
+        <button type="button" id="mobile-adv-btn-chat" onclick="switchMobileAdvView('chat')" class="py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm">
+            <i data-lucide="message-square" class="w-3.5 h-3.5"></i>Chat Asesor
+        </button>
+        <button type="button" id="mobile-adv-btn-dash" onclick="switchMobileAdvView('dash')" class="py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>Dashboard
+        </button>
+    </div>
+</div>
 
 <!-- Chat -->
-<div class="w-[42%] flex flex-col border-r border-slate-800/80 bg-slate-900 relative z-10 shadow-2xl" style="min-width:360px">
+<div id="adv-col-chat" class="w-full lg:w-[42%] lg:min-w-[360px] flex flex-col border-r border-slate-800/80 bg-slate-900 relative z-10 shadow-2xl flex-1 lg:flex-initial overflow-hidden min-h-0 min-w-0">
 <div class="px-5 py-2.5 border-b border-slate-800/60 flex items-center justify-end gap-2 bg-slate-900/95 backdrop-blur-xl">
     <button onclick="goTo('pos')" class="pos-btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[11px] font-semibold shadow-lg shadow-emerald-600/20 px-3 py-1.5"><i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>Punto de Venta</button>
     <button onclick="exportAdvisorDB()" title="Exportar" class="text-[10px] text-slate-500 hover:text-emerald-400 flex items-center gap-1 transition bg-slate-800/50 px-2.5 py-1.5 rounded-lg border border-slate-700/50"><i data-lucide="download" class="w-3 h-3"></i>Exportar</button>
 </div>
-<div class="px-5 py-2.5 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-[.1em] border-b border-slate-800/40">
+<div class="px-3 sm:px-5 py-2.5 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-[.1em] border-b border-slate-800/40 overflow-x-auto hide-sb flex-nowrap w-full min-w-0 shrink-0">
     <span id="s1" class="flex items-center gap-1 text-sky-400"><span class="w-4 h-4 rounded-full bg-sky-500 text-white flex items-center justify-center text-[8px]">1</span>Ventas</span><i data-lucide="chevron-right" class="w-3 h-3 text-slate-700 mx-1"></i>
     <span id="s2" class="flex items-center gap-1 text-slate-600"><span class="w-4 h-4 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center text-[8px]">2</span>Perfil</span><i data-lucide="chevron-right" class="w-3 h-3 text-slate-700 mx-1"></i>
     <span id="s3" class="flex items-center gap-1 text-slate-600"><span class="w-4 h-4 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center text-[8px]">3</span>Deuda</span><i data-lucide="chevron-right" class="w-3 h-3 text-slate-700 mx-1"></i>
@@ -652,18 +664,18 @@
 </div>
 
 <!-- Dashboard -->
-<div class="flex-1 bg-[#020617] flex flex-col relative overflow-hidden">
+<div id="adv-col-dash" class="w-full lg:flex-1 bg-[#020617] flex-col relative overflow-hidden hidden lg:flex flex-1">
 <div class="absolute inset-0 opacity-[0.012] pointer-events-none" style="background-image:radial-gradient(#94a3b8 1px,transparent 1px);background-size:30px 30px"></div>
-<div class="flex border-b border-slate-800/60 px-5 pt-3 gap-1.5 z-10 bg-slate-950/50 backdrop-blur-md">
+<div class="flex border-b border-slate-800/60 px-3 sm:px-5 pt-2 sm:pt-3 gap-1 sm:gap-1.5 z-10 bg-slate-950/50 backdrop-blur-md overflow-x-auto hide-sb flex-nowrap">
     <button onclick="showAdvTab('dash')" id="t-dash" class="tab-on px-4 py-2 rounded-t-lg border border-b-0 border-slate-700/60 text-[10px] font-bold uppercase tracking-wider transition flex items-center gap-1.5"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>Dashboard</button>
     <button onclick="showAdvTab('ratios')" id="t-ratios" class="px-4 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5"><i data-lucide="ratio" class="w-3.5 h-3.5"></i>Razones</button>
     <button onclick="showAdvTab('back')" id="t-back" class="px-4 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5"><i data-lucide="server" class="w-3.5 h-3.5"></i>Backend</button>
     <button onclick="showAdvTab('amor')" id="t-amor" class="px-4 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5"><i data-lucide="table-2" class="w-3.5 h-3.5"></i>Amortización</button>
 </div>
 <div id="v-dash" class="flex-1 overflow-y-auto p-5 space-y-4 z-10">
-    <div class="grid grid-cols-4 gap-3"><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">EBITDA Anual</div><div class="text-xl font-bold mono text-slate-600" id="m-ebitda">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Valor Empresarial</div><div class="text-xl font-bold mono text-slate-600" id="m-ev">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Margen Op.</div><div class="text-xl font-bold mono text-slate-600" id="m-margin">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Payback</div><div class="text-xl font-bold mono text-slate-600" id="m-payback">—</div></div></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3"><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">EBITDA Anual</div><div class="text-xl font-bold mono text-slate-600" id="m-ebitda">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Valor Empresarial</div><div class="text-xl font-bold mono text-slate-600" id="m-ev">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Margen Op.</div><div class="text-xl font-bold mono text-slate-600" id="m-margin">—</div></div><div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1.5">Payback</div><div class="text-xl font-bold mono text-slate-600" id="m-payback">—</div></div></div>
     <!-- FILA 2 DE MÉTRICAS AVANZADAS (TIR, VAN, MARGEN DE CONTRIBUCIÓN, PUNTO DE EQUILIBRIO FORMAL) -->
-    <div class="grid grid-cols-4 gap-3 mt-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mt-3">
         <div class="card border-sky-500/20 bg-sky-500/5">
             <div class="text-[9px] text-sky-400 uppercase font-bold tracking-wider mb-1 flex items-center justify-between">
                 <span>VAN (NPV 3 Años)</span>
@@ -697,10 +709,10 @@
             <div class="text-[9.5px] text-slate-500 mt-0.5">Ventas mínimas para no perder</div>
         </div>
     </div>
-    <div class="grid grid-cols-5 gap-4">
-        <div class="col-span-2 glass rounded-xl p-4"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-3">Estructura Mensual</h4><div class="relative flex items-center justify-center" style="height:185px"><canvas id="cDonut"></canvas><div class="absolute text-center pointer-events-none"><div class="text-[10px] text-slate-500">Margen</div><div class="text-xl font-bold mono text-slate-400" id="donutC">—</div></div></div></div>
-        <div class="col-span-1 glass rounded-xl p-4 flex flex-col items-center justify-center"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-4">DSCR</h4><div class="relative" style="width:105px;height:105px"><svg viewBox="0 0 36 36" class="w-full h-full -rotate-90"><path d="M18 2.0845a15.9155 15.9155 0 010 31.831 15.9155 15.9155 0 010-31.831" fill="none" stroke="#1e293b" stroke-width="2.5"/><path id="garc" d="M18 2.0845a15.9155 15.9155 0 010 31.831 15.9155 15.9155 0 010-31.831" fill="none" stroke="#334155" stroke-width="2.5" stroke-dasharray="0,100" class="gauge-arc"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-2xl font-bold mono text-slate-500" id="gVal">—</span></div></div><span class="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-600" id="gLbl">Sin datos</span></div>
-        <div class="col-span-2 glass rounded-xl p-4"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-3">Flujo Proyectado</h4><div style="height:185px"><canvas id="cBars"></canvas></div></div>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 sm:gap-4">
+        <div class="col-span-1 md:col-span-2 glass rounded-xl p-4"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-3">Estructura Mensual</h4><div class="relative flex items-center justify-center" style="height:185px"><canvas id="cDonut"></canvas><div class="absolute text-center pointer-events-none"><div class="text-[10px] text-slate-500">Margen</div><div class="text-xl font-bold mono text-slate-400" id="donutC">—</div></div></div></div>
+        <div class="col-span-1 md:col-span-1 glass rounded-xl p-4 flex flex-col items-center justify-center"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-4">DSCR</h4><div class="relative" style="width:105px;height:105px"><svg viewBox="0 0 36 36" class="w-full h-full -rotate-90"><path d="M18 2.0845a15.9155 15.9155 0 010 31.831 15.9155 15.9155 0 010-31.831" fill="none" stroke="#1e293b" stroke-width="2.5"/><path id="garc" d="M18 2.0845a15.9155 15.9155 0 010 31.831 15.9155 15.9155 0 010-31.831" fill="none" stroke="#334155" stroke-width="2.5" stroke-dasharray="0,100" class="gauge-arc"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-2xl font-bold mono text-slate-500" id="gVal">—</span></div></div><span class="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-600" id="gLbl">Sin datos</span></div>
+        <div class="col-span-1 md:col-span-2 glass rounded-xl p-4"><h4 class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-3">Flujo Proyectado</h4><div style="height:185px"><canvas id="cBars"></canvas></div></div>
     </div>
     <div class="glass rounded-xl p-4 flex items-center gap-4"><span class="text-[9px] text-slate-400 uppercase font-bold tracking-wider shrink-0">Completitud</span><div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div id="qBar" class="h-full bg-rose-500 fill" style="width:0%"></div></div><span id="qTxt" class="text-[11px] mono font-bold text-rose-400 w-10 text-right">0%</span><div id="qDots" class="flex gap-1.5"></div></div>
 </div>
@@ -709,29 +721,29 @@
     <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-1"><i data-lucide="ratio" class="w-4 h-4 text-sky-400"></i>Razones Financieras</h3>
     <p class="text-[11px] text-slate-500 mb-3">Métricas calculadas de forma determinista. Las fórmulas se muestran exactamente como el motor las computa.</p>
     <div class="mb-1"><span class="text-[9px] text-emerald-400 uppercase font-bold tracking-widest flex items-center gap-1.5"><i data-lucide="trending-up" class="w-3 h-3"></i>Rentabilidad</span></div>
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Margen Bruto</div><div class="text-lg font-bold mono text-slate-600" id="r-gm">—</div><div class="formula"><span id="f-gm"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Margen Neto</div><div class="text-lg font-bold mono text-slate-600" id="r-nm">—</div><div class="formula"><span id="f-nm"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Utilidad Neta Anual</div><div class="text-lg font-bold mono text-slate-600" id="r-np">—</div><div class="formula"><span id="f-np"></span></div></div>
     </div>
     <div class="mt-3 mb-1"><span class="text-[9px] text-sky-400 uppercase font-bold tracking-widest flex items-center gap-1.5"><i data-lucide="target" class="w-3 h-3"></i>Operación e Inversión</span></div>
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">ROI</div><div class="text-lg font-bold mono text-slate-600" id="r-roi">—</div><div class="formula"><span id="f-roi"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Punto de Equilibrio</div><div class="text-lg font-bold mono text-slate-600" id="r-be">—</div><div class="formula"><span id="f-be"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Meses Break-even</div><div class="text-lg font-bold mono text-slate-600" id="r-bem">—</div><div class="formula"><span id="f-bem"></span></div></div>
     </div>
-    <div class="grid grid-cols-3 gap-3 mt-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 mt-3">
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Eficiencia Operativa</div><div class="text-lg font-bold mono text-slate-600" id="r-eff">—</div><div class="formula"><span id="f-eff"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">EBITDA</div><div class="text-lg font-bold mono text-slate-600" id="r-ebitda2">—</div><div class="formula"><span id="f-ebitda"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Valor Empresarial</div><div class="text-lg font-bold mono text-slate-600" id="r-ev2">—</div><div class="formula"><span id="f-ev"></span></div></div>
     </div>
     <div class="mt-3 mb-1"><span class="text-[9px] text-rose-400 uppercase font-bold tracking-widest flex items-center gap-1.5"><i data-lucide="shield-alert" class="w-3 h-3"></i>Deuda y Riesgo</span></div>
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">DSCR</div><div class="text-lg font-bold mono text-slate-600" id="r-dscr">—</div><div class="formula"><span id="f-dscr"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Cobertura de Intereses</div><div class="text-lg font-bold mono text-slate-600" id="r-icr">—</div><div class="formula"><span id="f-icr"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Deuda / Ingresos</div><div class="text-lg font-bold mono text-slate-600" id="r-dti">—</div><div class="formula"><span id="f-dti"></span></div></div>
     </div>
-    <div class="grid grid-cols-3 gap-3 mt-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 mt-3">
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Apalancamiento</div><div class="text-lg font-bold mono text-slate-600" id="r-lev">—</div><div class="formula"><span id="f-lev"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Payback</div><div class="text-lg font-bold mono text-slate-600" id="r-pay">—</div><div class="formula"><span id="f-pay"></span></div></div>
         <div class="ratio-card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Cuota Anual (PMT)</div><div class="text-lg font-bold mono text-slate-600" id="r-pmt">—</div><div class="formula"><span id="f-pmt"></span></div></div>
@@ -744,17 +756,29 @@
 </div>
 
 <!-- ===== MÓDULO: PUNTO DE VENTA ===== -->
-<div id="view-pos" class="flex-1 flex overflow-hidden hidden">
+<div id="view-pos" class="flex-1 flex flex-col lg:flex-row overflow-hidden hidden">
+
+<!-- Selector Móvil: Operación vs Resumen (< 1024px) -->
+<div class="lg:hidden flex items-center justify-center px-3 py-2 bg-slate-950/90 border-b border-slate-800/80 shrink-0 z-30">
+    <div class="grid grid-cols-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800 w-full max-w-sm gap-1 shadow-inner">
+        <button type="button" id="mobile-pos-btn-ops" onclick="switchMobilePosView('ops')" class="py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm">
+            <i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>Operación (Ventas)
+        </button>
+        <button type="button" id="mobile-pos-btn-stats" onclick="switchMobilePosView('stats')" class="py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200">
+            <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>Resumen & KPIs
+        </button>
+    </div>
+</div>
 
 <!-- POS: Panel Izquierdo - Catálogo -->
-<div class="w-[38%] flex flex-col border-r border-slate-800/80 bg-slate-900 relative" style="min-width:340px">
+<div id="pos-col-left" class="w-full lg:w-[38%] lg:min-w-[340px] flex flex-col border-r border-slate-800/80 bg-slate-900 relative flex-1 lg:flex-initial overflow-hidden min-h-0 min-w-0">
 
-<!-- POS Tabs -->
-<div class="flex border-b border-slate-800/40 px-4 pt-2 gap-1 overflow-x-auto hide-sb">
-    <button onclick="showPosTab('catalog')" id="pt-catalog" class="tab-on px-3 py-2 rounded-t-lg border border-b-0 border-slate-700/60 text-[10px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 shrink-0"><i data-lucide="package" class="w-3 h-3"></i>Catálogo</button>
-    <button onclick="showPosTab('sell')" id="pt-sell" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5 shrink-0"><i data-lucide="receipt" class="w-3 h-3"></i>Venta</button>
-    <button onclick="showPosTab('expense')" id="pt-expense" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5 shrink-0"><i data-lucide="wallet" class="w-3 h-3"></i>Gastos</button>
-    <button onclick="showPosTab('users')" id="pt-users" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-purple-400/80 hover:text-purple-300 transition flex items-center gap-1.5 shrink-0 relative">
+<!-- POS Tabs (Scroll táctil horizontal y fluido) -->
+<div id="pos-ops-subtab-bar" class="flex border-b border-slate-800/40 px-3 sm:px-4 pt-2 gap-1.5 overflow-x-auto hide-sb flex-nowrap w-full min-w-0 shrink-0 select-none touch-pan-x z-20">
+    <button onclick="showPosTab('catalog')" id="pt-catalog" class="tab-on px-3 py-2 rounded-t-lg border border-b-0 border-slate-700/60 text-[10px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"><i data-lucide="package" class="w-3 h-3"></i>Catálogo</button>
+    <button onclick="showPosTab('sell')" id="pt-sell" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"><i data-lucide="receipt" class="w-3 h-3"></i>Venta</button>
+    <button onclick="showPosTab('expense')" id="pt-expense" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"><i data-lucide="wallet" class="w-3 h-3"></i>Gastos</button>
+    <button onclick="showPosTab('users')" id="pt-users" class="px-3 py-2 rounded-t-lg border border-b-0 border-transparent text-[10px] font-bold uppercase tracking-wider text-purple-400/80 hover:text-purple-300 transition flex items-center gap-1.5 shrink-0 whitespace-nowrap relative">
         <i data-lucide="shield-check" class="w-3 h-3 text-purple-400"></i>Usuarios & Control
         <span id="tab-pending-badge" class="hidden w-2 h-2 rounded-full bg-amber-400 ml-0.5 animate-pulse"></span>
     </button>
@@ -1268,12 +1292,12 @@
 </div>
 
 <!-- POS: Panel Derecho - Resumen & Estadísticas -->
-<div class="flex-1 bg-[#020617] flex flex-col relative overflow-hidden">
+<div id="pos-col-right" class="w-full lg:flex-1 bg-[#020617] flex-col relative overflow-hidden hidden lg:flex flex-1">
 <div class="absolute inset-0 opacity-[0.012] pointer-events-none" style="background-image:radial-gradient(#94a3b8 1px,transparent 1px);background-size:30px 30px"></div>
 
 <!-- Subtab Bar: Resumen Diario vs Estadísticas -->
-<div class="px-5 pt-3 pb-0 flex items-center justify-between border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md z-10">
-    <div class="flex gap-1.5" id="pos-subtab-bar">
+<div class="px-3 sm:px-5 pt-2 sm:pt-3 pb-0 flex flex-wrap sm:flex-nowrap items-center justify-between border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md z-10 gap-2">
+    <div class="flex gap-1.5 overflow-x-auto hide-sb flex-nowrap w-full sm:w-auto pb-1 sm:pb-0" id="pos-subtab-bar">
         <button onclick="showPosViewMode('today')" id="btn-pos-today" class="tab-on px-4 py-2 rounded-t-lg border border-b-0 border-slate-700/60 text-[10.5px] font-bold uppercase tracking-wider transition flex items-center gap-1.5">
             <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-400"></i>Resumen de Hoy
         </button>
@@ -1345,7 +1369,7 @@
             </button>
         </div>
     </div>
-    <div class="grid grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Ventas Hoy</div><div class="text-xl font-bold mono text-emerald-400" id="pos-sales-total">$0</div></div>
         <div class="card" id="card-pos-cogs"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Costo Prod.</div><div class="text-xl font-bold mono text-rose-400" id="pos-cogs">$0</div></div>
         <div class="card"><div class="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-1">Gastos Hoy</div><div class="text-xl font-bold mono text-amber-400" id="pos-exp-total">$0</div></div>
@@ -1353,7 +1377,7 @@
     </div>
 
     <!-- Desglose por Método de Pago de Hoy -->
-    <div class="grid grid-cols-3 gap-2.5">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
         <div class="p-2.5 rounded-xl bg-slate-900/60 border border-emerald-500/25 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0"><i data-lucide="banknote" class="w-4 h-4"></i></span>
@@ -1412,7 +1436,7 @@
     <!-- Contenido estadístico si existen ventas -->
     <div id="stats-content" class="space-y-4 hidden">
         <!-- KPIs Principales -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             <!-- Producto Más Vendido (Hero) -->
             <div class="glass-light rounded-xl p-4 border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-900/60 to-slate-900/80 flex flex-col justify-between">
                 <div class="flex items-center justify-between mb-2">
@@ -1526,7 +1550,7 @@
         </div>
 
         <!-- KPI Cards de Almacén -->
-        <div class="grid grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             <div class="card border-teal-500/20 bg-teal-500/5">
                 <div class="text-[9px] text-teal-400 uppercase font-bold tracking-wider mb-1 flex items-center justify-center gap-1">
                     <i data-lucide="package" class="w-3 h-3"></i>Catálogo

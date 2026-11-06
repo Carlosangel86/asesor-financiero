@@ -1,5 +1,95 @@
 // ===== NAVEGACIÓN, ORQUESTACIÓN & ARRANQUE DE LA APLICACIÓN =====
 
+// ===== CONTROL RESPONSIVO MÓVIL (< 1024px) =====
+let mobilePosActiveCol = 'ops';   // 'ops' | 'stats'
+let mobileAdvActiveCol = 'chat';  // 'chat' | 'dash'
+
+function switchMobilePosView(col) {
+    mobilePosActiveCol = col;
+    const colLeft = document.getElementById('pos-col-left');
+    const colRight = document.getElementById('pos-col-right');
+    const btnOps = document.getElementById('mobile-pos-btn-ops');
+    const btnStats = document.getElementById('mobile-pos-btn-stats');
+
+    if (window.innerWidth < 1024) {
+        if (col === 'ops') {
+            if (colLeft) { colLeft.classList.remove('hidden'); colLeft.classList.add('flex'); }
+            if (colRight) { colRight.classList.add('hidden'); colRight.classList.remove('flex'); }
+            if (btnOps) {
+                btnOps.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
+            }
+            if (btnStats) {
+                btnStats.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            }
+        } else {
+            if (colLeft) { colLeft.classList.add('hidden'); colLeft.classList.remove('flex'); }
+            if (colRight) { colRight.classList.remove('hidden'); colRight.classList.add('flex'); }
+            if (btnOps) {
+                btnOps.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            }
+            if (btnStats) {
+                btnStats.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
+            }
+            if (hourlyChart) { hourlyChart.resize(); hourlyChart.update(); }
+        }
+    } else {
+        if (colLeft) { colLeft.classList.remove('hidden'); colLeft.classList.add('flex'); }
+        if (colRight) { colRight.classList.remove('hidden'); colRight.classList.add('flex'); }
+    }
+    if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+function switchMobileAdvView(col) {
+    mobileAdvActiveCol = col;
+    const colChat = document.getElementById('adv-col-chat');
+    const colDash = document.getElementById('adv-col-dash');
+    const btnChat = document.getElementById('mobile-adv-btn-chat');
+    const btnDash = document.getElementById('mobile-adv-btn-dash');
+
+    if (window.innerWidth < 1024) {
+        if (col === 'chat') {
+            if (colChat) { colChat.classList.remove('hidden'); colChat.classList.add('flex'); }
+            if (colDash) { colDash.classList.add('hidden'); colDash.classList.remove('flex'); }
+            if (btnChat) {
+                btnChat.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm';
+            }
+            if (btnDash) {
+                btnDash.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            }
+        } else {
+            if (colChat) { colChat.classList.add('hidden'); colChat.classList.remove('flex'); }
+            if (colDash) { colDash.classList.remove('hidden'); colDash.classList.add('flex'); }
+            if (btnChat) {
+                btnChat.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            }
+            if (btnDash) {
+                btnDash.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm';
+            }
+        }
+    } else {
+        if (colChat) { colChat.classList.remove('hidden'); colChat.classList.add('flex'); }
+        if (colDash) { colDash.classList.remove('hidden'); colDash.classList.add('flex'); }
+    }
+    if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+window.addEventListener('resize', function() {
+    if (window.innerWidth >= 1024) {
+        const colLeft = document.getElementById('pos-col-left');
+        const colRight = document.getElementById('pos-col-right');
+        if (colLeft) { colLeft.classList.remove('hidden'); colLeft.classList.add('flex'); }
+        if (colRight) { colRight.classList.remove('hidden'); colRight.classList.add('flex'); }
+
+        const colChat = document.getElementById('adv-col-chat');
+        const colDash = document.getElementById('adv-col-dash');
+        if (colChat) { colChat.classList.remove('hidden'); colChat.classList.add('flex'); }
+        if (colDash) { colDash.classList.remove('hidden'); colDash.classList.add('flex'); }
+    } else {
+        switchMobilePosView(mobilePosActiveCol);
+        switchMobileAdvView(mobileAdvActiveCol);
+    }
+});
+
 // ===== NAVIGATION =====
 let posViewMode = 'today';
 function goTo(v){
@@ -41,10 +131,12 @@ function goTo(v){
         applyRoleUI();
         if(!hourlyChart) initHourlyChart();
         if(hourlyChart) { hourlyChart.resize(); hourlyChart.update(); }
+        if (window.innerWidth < 1024) switchMobilePosView(mobilePosActiveCol);
     }
     if(v === 'advisor'){
         checkPosData();
         updateInitialHints();
+        if (window.innerWidth < 1024) switchMobileAdvView(mobileAdvActiveCol);
     }
     const btnBack = document.getElementById('btn-header-back-menu');
     if(btnBack) btnBack.classList.toggle('hidden', v === 'menu');
@@ -103,6 +195,7 @@ function showPosViewMode(mode){
 
     posViewMode = mode;
     try { sessionStorage.setItem('procana_last_pos_tab', mode); } catch(e){}
+    if (window.innerWidth < 1024) switchMobilePosView('stats');
     ['today', 'stats', 'almacen', 'shifts', 'invoices'].forEach(m => {
         const el = document.getElementById('pos-panel-' + m);
         const btn = document.getElementById('btn-pos-' + m);
@@ -112,6 +205,7 @@ function showPosViewMode(mode){
             if(isActive){
                 btn.classList.add('tab-on');
                 btn.classList.remove('text-slate-500');
+                try { btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch(e){}
             } else {
                 btn.classList.remove('tab-on');
                 btn.classList.add('text-slate-500');
