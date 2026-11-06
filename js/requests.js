@@ -30,6 +30,10 @@ function promptRequestCancel(saleId){
     }
     const sale = salesLog.find(s => s.id === saleId);
     if(!sale){ alert('Venta no encontrada.'); return; }
+    if(typeof isSaleFromClosedShift === 'function' && isSaleFromClosedShift(sale)){
+        alert('⛔ Venta Protegida:\n\nEsta venta pertenece a un turno ya cerrado con Corte Z. Por auditoría contable y cuadre de caja, no puede solicitarse su cancelación.');
+        return;
+    }
     if(sale.status === 'cancelled'){ alert('Esta venta ya se encuentra cancelada.'); return; }
     if(cancelRequests.some(r => r.saleId === saleId && r.status === 'pending')){
         alert('Ya existe una solicitud pendiente de autorización para esta venta.');
@@ -66,6 +70,10 @@ function promptDirectCancel(saleId){
     }
     const sale = salesLog.find(s => s.id === saleId);
     if(!sale){ alert('Venta no encontrada.'); return; }
+    if(typeof isSaleFromClosedShift === 'function' && isSaleFromClosedShift(sale)){
+        alert('⛔ Venta Protegida:\n\nEsta venta pertenece a un turno ya cerrado con Corte Z. Por integridad contable y balance de caja, las ventas de turnos cerrados no pueden ser canceladas.');
+        return;
+    }
     if(sale.status === 'cancelled'){ alert('Esta venta ya está cancelada.'); return; }
 
     activeCancelAction = { mode: 'direct', saleId };
@@ -179,6 +187,10 @@ function cancelSaleDirect(saleId, reason){
     }
     const sale = salesLog.find(s => s.id === saleId);
     if(!sale){ alert('Venta no encontrada.'); return; }
+    if(typeof isSaleFromClosedShift === 'function' && isSaleFromClosedShift(sale)){
+        alert('⛔ Venta Protegida:\n\nEsta venta pertenece a un turno ya cerrado con Corte Z. Las ventas archivadas son inmutables.');
+        return;
+    }
     if(sale.status === 'cancelled'){
         alert('⛔ Esta venta ya fue cancelada anteriormente. No se duplicará el reintegro de inventario.');
         return;
@@ -252,6 +264,17 @@ function approveCancelRequest(reqId){
         if (window.FirebaseService && window.FirebaseService.stats) {
         window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
     }
+        renderCancelRequests();
+        return;
+    }
+
+    if(typeof isSaleFromClosedShift === 'function' && isSaleFromClosedShift(sale)){
+        alert('⛔ Venta Protegida:\n\nEsta venta pertenece a un turno ya cerrado con Corte Z. No se puede autorizar la cancelación.');
+        req.status = 'rejected';
+        req.notes = 'Rechazada: Venta pertenece a un turno ya cerrado con Corte Z';
+        if (window.FirebaseService && window.FirebaseService.stats) {
+            window.FirebaseService.stats.saveCancelRequests(cancelRequests).catch(console.warn);
+        }
         renderCancelRequests();
         return;
     }

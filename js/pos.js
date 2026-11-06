@@ -1006,7 +1006,7 @@ const REFACCIONES_CATALOG = [
 let catalog = JSON.parse(JSON.stringify(REFACCIONES_CATALOG));
 catalog.forEach(p => { if(p.stock === undefined || p.stock === null) p.stock = 20; });
 let salesLog = [];
-let expenses = [];
+let expenses = JSON.parse(localStorage.getItem('pos_expenses') || '[]');
 let ticket = [];
 let posChart;
 
@@ -1082,9 +1082,16 @@ async function initPosData(){
 
         if (window.FirebaseService && window.FirebaseService.stats) {
             const cloudExpenses = await window.FirebaseService.stats.getExpenses();
-            if (cloudExpenses) {
+            if (cloudExpenses && cloudExpenses.length > 0) {
                 expenses = cloudExpenses;
+                localStorage.setItem('pos_expenses', JSON.stringify(expenses));
+            } else if (expenses.length > 0) {
+                window.FirebaseService.stats.saveExpenses(expenses).catch(console.warn);
             }
+        }
+
+        if (typeof loadShiftsFromFirebase === 'function') {
+            await loadShiftsFromFirebase();
         }
     } catch(e) {
         console.error('[Error al sincronizar POS con Firestore]', e);
@@ -1767,6 +1774,11 @@ function onSellProductChange(fromProgrammatic = false){
 }
 
 function openSellQtyModal(pid){
+    if(!currentShift || currentShift.status !== 'open'){
+        alert('⛔ Turno de Caja Cerrado:\n\nDebes abrir un turno de caja con tu fondo inicial antes de registrar ventas.');
+        if(typeof promptOpenShift === 'function') promptOpenShift();
+        return;
+    }
     const prod = catalog.find(p => p.id === pid);
     if(!prod) return;
     const inTicket = (ticket.find(t => t.id === pid)?.qty) || 0;
@@ -1811,11 +1823,6 @@ function openSellQtyModal(pid){
 function closeSellQtyModal(){
     const modal = document.getElementById('sell-qty-modal');
     if(modal) modal.classList.add('hidden');
-    const qtyInput = document.getElementById('sell-qty');
-    if(qtyInput){
-        qtyInput.focus();
-        qtyInput.select();
-    }
 }
 
 function updateSellQtyModalSubtotal(){
@@ -1895,6 +1902,11 @@ function adjustSellQty(delta){
 function addSaleItemWithQty(pid, qty){
     if(!hasPermission('pos.sell')){
         showAccessDeniedModal('Tu rol no tiene autorización para agregar productos al ticket de venta.');
+        return;
+    }
+    if(!currentShift || currentShift.status !== 'open'){
+        alert('⛔ Turno de Caja Cerrado:\n\nDebes abrir un turno de caja con tu fondo inicial antes de agregar productos al ticket.');
+        if(typeof promptOpenShift === 'function') promptOpenShift();
         return;
     }
     if(!pid){alert('Selecciona un producto.');return;}
@@ -2367,6 +2379,11 @@ function closeSale(){
         showAccessDeniedModal('Tu rol no tiene autorización para realizar cobros o registrar ventas.');
         return;
     }
+    if(!currentShift || currentShift.status !== 'open'){
+        alert('⛔ Turno de Caja Cerrado:\n\nDebes abrir un turno de caja con tu fondo inicial antes de realizar cobros.');
+        if(typeof promptOpenShift === 'function') promptOpenShift();
+        return;
+    }
     if(ticket.length===0){alert('El ticket está vacío. Agrega al menos un producto para cobrar.');return;}
 
     // Verify stock before closing sale
@@ -2463,21 +2480,6 @@ function closeSale(){
         }
     }
 
-    // Validar turno de caja antes de registrar (o auto-iniciar si no hay)
-    if(!currentShift || currentShift.status !== 'open'){
-        currentShift = {
-            id: 'sh_' + Date.now(),
-            openedAt: new Date().toISOString(),
-            closedAt: null,
-            cashierId: currentUser ? currentUser.id : 'usr_caja',
-            cashierUsername: currentUser ? currentUser.username : 'caja_demo',
-            cashierName: currentUser ? currentUser.name : 'Cajero',
-            initialCashFloat: 500,
-            status: 'open'
-        };
-        localStorage.setItem('pos_current_shift', JSON.stringify(currentShift));
-    }
-
     const subtotalCalc = total / (1 + currentTaxZoneRate);
     const taxAmountCalc = total - subtotalCalc;
 
@@ -2491,7 +2493,7 @@ function closeSale(){
         taxAmount:taxAmountCalc,
         totalCost:totalCost,
         payment:paymentData,
-        shiftId:currentShift.id,
+        shiftId: currentShift ? currentShift.id : ('sh_' + Date.now()),
         status: 'completed',
         cashierId: currentUser ? currentUser.id : 'usr_caja',
         cashierUsername: currentUser ? currentUser.username : 'caja_demo',
@@ -2532,27 +2534,202 @@ function closeSale(){
     }, 150);
 }
 
+let expenseFilter = 'today';
+
+function setExpenseFilter(filter){
+    expenseFilter = filter;
+    const btnToday = document.getElementById('btn-exp-filter-today');
+    const btnAll = document.getElementById('btn-exp-filter-all');
+    if(btnToday && btnAll){
+        if(filter === 'today'){
+            btnToday.className = 'px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            btnAll.className = 'px-2 py-0.5 rounded font-semibold text-slate-400 hover:text-white';
+        } else {
+            btnAll.className = 'px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            btnToday.className = 'px-2 py-0.5 rounded font-semibold text-slate-400 hover:text-white';
+        }
+    }
+    renderExpenses();
+}
+
 function addExpense(){
-    if(!hasPermission('inventory.adjust') && !hasPermission('catalog.edit') && !hasPermission('sales.approve_cancel')){
+    if(!hasPermission('inventory.adjust') && !hasPermission('catalog.edit') && !hasPermission('sales.approve_cancel') && (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor'))){
         showAccessDeniedModal('Solo un Supervisor o Administrador puede registrar gastos operativos.');
         return;
     }
-    const desc=document.getElementById('exp-desc').value.trim();
-    const amount=parseFloat(document.getElementById('exp-amount').value);
-    const cat=document.getElementById('exp-cat').value;
-    if(!desc||isNaN(amount)){alert('Completa los campos.');return;}
-    expenses.push({id:'e_'+Date.now(),date:new Date().toISOString(),desc,amount,category:cat});
-    localStorage.setItem('pos_expenses',JSON.stringify(expenses));
+    const desc = document.getElementById('exp-desc').value.trim();
+    const amount = parseFloat(document.getElementById('exp-amount').value);
+    const cat = document.getElementById('exp-cat').value;
+    if(!desc || isNaN(amount) || amount < 0){
+        alert('Completa los campos con una descripción válida y un monto numérico mayor o igual a cero.');
+        return;
+    }
+    const newExp = {
+        id: 'e_' + Date.now(),
+        date: new Date().toISOString(),
+        desc,
+        amount,
+        category: cat,
+        createdBy: currentUser ? `@${currentUser.username}` : 'sistema'
+    };
+    expenses.unshift(newExp);
+    localStorage.setItem('pos_expenses', JSON.stringify(expenses));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveExpenses(expenses).catch(console.warn);
+    }
     logActivity('Gasto Registrado', `Gasto de ${fmt(amount)} (${desc}) registrado por @${currentUser ? currentUser.username : 'sistema'}`, 'warn');
-    document.getElementById('exp-desc').value='';document.getElementById('exp-amount').value='';
-    renderExpenses();upPosSummary();
+    document.getElementById('exp-desc').value = '';
+    document.getElementById('exp-amount').value = '';
+    renderExpenses();
+    upPosSummary();
+    upPosStats();
 }
 
 function renderExpenses(){
-    const today=new Date().toDateString();
-    const todayExp=expenses.filter(e=>new Date(e.date).toDateString()===today);
-    if(todayExp.length===0){document.getElementById('exp-list').innerHTML='<div class="text-slate-600 text-sm text-center py-6">Sin gastos hoy.</div>';return;}
-    document.getElementById('exp-list').innerHTML=todayExp.map(e=>`<div class="pos-row"><div class="flex-1"><div class="text-sm text-white">${e.desc}</div><div class="text-[10px] text-slate-500">${e.category==='fijo'?'Gasto Fijo':e.category==='variable'?'Gasto Variable':'Otro'}</div></div><div class="text-sm mono text-rose-400">${fmt(e.amount)}</div></div>`).join('');
+    const listEl = document.getElementById('exp-list');
+    if(!listEl) return;
+    const today = new Date().toDateString();
+    const countEl = document.getElementById('exp-total-count');
+    if(countEl) countEl.textContent = expenses.length;
+
+    const filtered = (expenseFilter === 'today')
+        ? expenses.filter(e => new Date(e.date).toDateString() === today)
+        : [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    const canManageExpenses = hasPermission('inventory.adjust') || hasPermission('catalog.edit') || hasPermission('sales.approve_cancel') || (currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor'));
+
+    if(filtered.length === 0){
+        listEl.innerHTML = `<div class="text-slate-600 text-sm text-center py-6">${expenseFilter === 'today' ? 'Sin gastos registrados hoy.' : 'No hay gastos registrados en el historial.'}</div>`;
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(e => {
+        const catLabel = e.category === 'fijo' ? 'Gasto Fijo' : e.category === 'variable' ? 'Gasto Variable' : 'Otro';
+        const d = new Date(e.date);
+        const dateStr = expenseFilter === 'today'
+            ? d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            : `${d.toLocaleDateString([], {day:'2-digit', month:'short'})} ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
+        const actions = canManageExpenses ? `
+            <div class="flex items-center gap-1 shrink-0 ml-2">
+                <button type="button" onclick="openEditExpenseModal('${e.id}')" class="text-slate-500 hover:text-amber-400 transition p-1" title="Editar Gasto">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                </button>
+                <button type="button" onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-rose-400 transition p-1" title="Eliminar Gasto">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+        ` : '';
+
+        return `
+            <div class="pos-row group">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm text-white font-medium truncate">${e.desc}</div>
+                    <div class="text-[10px] text-slate-500 flex items-center gap-2">
+                        <span class="pill bg-slate-800 text-slate-400 border border-slate-700 text-[9px] px-1.5 py-0.2">${catLabel}</span>
+                        <span class="mono text-slate-400">${dateStr}</span>
+                    </div>
+                </div>
+                <div class="text-sm mono font-semibold text-rose-400 shrink-0">${fmt(e.amount)}</div>
+                ${actions}
+            </div>
+        `;
+    }).join('');
+
+    lucide.createIcons();
+}
+
+function openEditExpenseModal(id){
+    if(!hasPermission('inventory.adjust') && !hasPermission('catalog.edit') && !hasPermission('sales.approve_cancel') && (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor'))){
+        showAccessDeniedModal('Solo un Supervisor o Administrador puede editar gastos operativos.');
+        return;
+    }
+    const exp = expenses.find(e => e.id === id);
+    if(!exp){ alert('Gasto no encontrado.'); return; }
+
+    document.getElementById('edit-exp-id').value = exp.id;
+    const disp = document.getElementById('edit-exp-id-display');
+    if(disp) disp.textContent = `#${exp.id}`;
+    document.getElementById('edit-exp-desc').value = exp.desc || '';
+    document.getElementById('edit-exp-amount').value = exp.amount !== undefined ? exp.amount : '';
+    document.getElementById('edit-exp-cat').value = exp.category || 'fijo';
+
+    const modal = document.getElementById('expense-edit-modal');
+    if(modal) modal.classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function closeEditExpenseModal(){
+    const modal = document.getElementById('expense-edit-modal');
+    if(modal) modal.classList.add('hidden');
+}
+
+function saveEditExpense(){
+    if(!hasPermission('inventory.adjust') && !hasPermission('catalog.edit') && !hasPermission('sales.approve_cancel') && (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor'))){
+        showAccessDeniedModal('Solo un Supervisor o Administrador puede editar gastos operativos.');
+        return;
+    }
+    const id = document.getElementById('edit-exp-id').value;
+    const desc = document.getElementById('edit-exp-desc').value.trim();
+    const amount = parseFloat(document.getElementById('edit-exp-amount').value);
+    const cat = document.getElementById('edit-exp-cat').value;
+
+    if(!desc || isNaN(amount) || amount < 0){
+        alert('Por favor ingresa una descripción válida y un monto numérico mayor o igual a cero.');
+        return;
+    }
+
+    const expIndex = expenses.findIndex(e => e.id === id);
+    if(expIndex === -1){
+        alert('Gasto no encontrado.');
+        return;
+    }
+
+    const prevDesc = expenses[expIndex].desc;
+    const prevAmount = expenses[expIndex].amount;
+
+    expenses[expIndex].desc = desc;
+    expenses[expIndex].amount = amount;
+    expenses[expIndex].category = cat;
+    expenses[expIndex].updatedAt = new Date().toISOString();
+    expenses[expIndex].updatedBy = currentUser ? `@${currentUser.username}` : 'sistema';
+
+    localStorage.setItem('pos_expenses', JSON.stringify(expenses));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveExpenses(expenses).catch(console.warn);
+    }
+
+    logActivity('Gasto Modificado', `Gasto editado de "${prevDesc}" (${fmt(prevAmount)}) a "${desc}" (${fmt(amount)}) por @${currentUser ? currentUser.username : 'sistema'}`, 'info');
+
+    closeEditExpenseModal();
+    renderExpenses();
+    upPosSummary();
+    upPosStats();
+}
+
+function deleteExpense(id){
+    if(!hasPermission('inventory.adjust') && !hasPermission('catalog.edit') && !hasPermission('sales.approve_cancel') && (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor'))){
+        showAccessDeniedModal('Solo un Supervisor o Administrador puede eliminar gastos operativos.');
+        return;
+    }
+    const exp = expenses.find(e => e.id === id);
+    if(!exp){ alert('Gasto no encontrado.'); return; }
+
+    if(!confirm(`¿Estás seguro de que deseas eliminar el gasto "${exp.desc}" por ${fmt(exp.amount)}?\n\nEsta acción no se puede deshacer.`)){
+        return;
+    }
+
+    expenses = expenses.filter(e => e.id !== id);
+    localStorage.setItem('pos_expenses', JSON.stringify(expenses));
+    if (window.FirebaseService && window.FirebaseService.stats) {
+        window.FirebaseService.stats.saveExpenses(expenses).catch(console.warn);
+    }
+
+    logActivity('Gasto Eliminado', `Gasto "${exp.desc}" (${fmt(exp.amount)}) eliminado por @${currentUser ? currentUser.username : 'sistema'}`, 'danger');
+
+    renderExpenses();
+    upPosSummary();
+    upPosStats();
 }
 
 function upPosSummary(){
@@ -2659,6 +2836,7 @@ function upPosSummary(){
 
             let statusBadge = '';
             let actionBtn = '';
+            const isClosedShift = typeof isSaleFromClosedShift === 'function' ? isSaleFromClosedShift(s) : false;
 
             if(isCancelled){
                 statusBadge = `<span class="pill bg-rose-500/25 text-rose-300 border border-rose-500/40 text-[9px] font-bold"><i data-lucide="ban" class="w-2.5 h-2.5"></i>CANCELADA</span>`;
@@ -2666,10 +2844,16 @@ function upPosSummary(){
                 statusBadge = `<span class="pill bg-amber-500/20 text-amber-300 border border-amber-500/35 text-[9px] font-bold animate-pulse"><i data-lucide="clock" class="w-2.5 h-2.5"></i>Cancelación Solicitada</span>`;
             }
 
+            if(isClosedShift){
+                statusBadge += ` <span class="pill bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-bold" title="Turno Cerrado (Corte Z realizado)"><i data-lucide="lock" class="w-2.5 h-2.5 text-amber-400"></i>Corte Z</span>`;
+            }
+
             const printBtn = `<button onclick="printSaleTicket('${s.id}')" class="text-slate-500 hover:text-sky-300 transition p-1 shrink-0" title="Imprimir Ticket Térmico"><i data-lucide="printer" class="w-4 h-4"></i></button>`;
 
             if(!isCancelled){
-                if(canDirectCancel){
+                if(isClosedShift){
+                    actionBtn = `${printBtn}<span class="text-slate-600 p-1 shrink-0 inline-flex items-center cursor-not-allowed" title="Turno Cerrado (Corte Z) · Venta inmutable"><i data-lucide="lock" class="w-3.5 h-3.5"></i></span>`;
+                } else if(canDirectCancel){
                     actionBtn = `${printBtn}<button onclick="promptDirectCancel('${s.id}')" class="text-slate-600 hover:text-rose-400 transition p-1 shrink-0" title="Cancelar Venta (Directa)"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
                 } else if(canRequestCancel && !hasPendingReq){
                     actionBtn = `${printBtn}<button onclick="promptRequestCancel('${s.id}')" class="text-slate-500 hover:text-amber-400 transition p-1 shrink-0 text-[10px] flex items-center gap-0.5 border border-slate-700/60 rounded px-1.5 py-0.5 bg-slate-800/60" title="Solicitar Cancelación al Supervisor"><i data-lucide="flag" class="w-3 h-3 text-amber-400"></i>Solicitar</button>`;
@@ -2716,6 +2900,11 @@ function upPosSummary(){
 }
 
 function deleteSale(id){
+    const s = salesLog.find(item => item.id === id);
+    if(s && typeof isSaleFromClosedShift === 'function' && isSaleFromClosedShift(s)){
+        alert('⛔ Venta Protegida:\n\nEsta venta pertenece a un turno ya cerrado con Corte Z. Por integridad contable y balance de caja, las ventas de turnos cerrados no pueden ser canceladas.');
+        return;
+    }
     // Redirigir a cancelación directa o solicitud según permisos
     if(hasPermission('sales.cancel_direct')){
         promptDirectCancel(id);

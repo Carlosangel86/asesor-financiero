@@ -1,10 +1,70 @@
 // ===== CONTROL DE TURNOS Y ARQUEOS DE CAJA =====
+let currentShift = null;
+let shiftsHistory = [];
 
-// ===== CONTROL DE TURNOS Y ARQUEOS DE CAJA =====
-let currentShift = JSON.parse(localStorage.getItem('pos_current_shift')) || null;
-let shiftsHistory = JSON.parse(localStorage.getItem('pos_shifts_history')) || [];
+try {
+    const _lsShift = JSON.parse(localStorage.getItem('pos_current_shift'));
+    if(_lsShift && _lsShift.status === 'open' && !_lsShift.closedAt) {
+        currentShift = _lsShift;
+    } else {
+        localStorage.removeItem('pos_current_shift');
+    }
+    const _lsHist = JSON.parse(localStorage.getItem('pos_shifts_history'));
+    if(Array.isArray(_lsHist)) shiftsHistory = _lsHist;
+} catch(e) {
+    currentShift = null;
+    shiftsHistory = [];
+}
 
+// Sincronización bidireccional estricta con Firebase Firestore
+async function loadShiftsFromFirebase(){
+    if(!window.FirebaseService || !window.FirebaseService.stats) return;
+    try {
+        const fsShift = await window.FirebaseService.stats.getCurrentShift();
+        if(fsShift && fsShift.status === 'open' && !fsShift.closedAt){
+            currentShift = fsShift;
+            localStorage.setItem('pos_current_shift', JSON.stringify(currentShift));
+        } else {
+            currentShift = null;
+            localStorage.removeItem('pos_current_shift');
+            if(fsShift && fsShift.status === 'closed'){
+                window.FirebaseService.stats.saveCurrentShift(null).catch(console.warn);
+            }
+        }
 
+        const fsHistory = await window.FirebaseService.stats.getShiftsHistory();
+        if(Array.isArray(fsHistory) && fsHistory.length > 0){
+            shiftsHistory = fsHistory;
+            localStorage.setItem('pos_shifts_history', JSON.stringify(shiftsHistory));
+        }
+    } catch(err){
+        console.warn('[Sync Shifts Error]', err);
+    }
+    updateShiftUI();
+    if(typeof renderShiftsHistoryView === 'function') renderShiftsHistoryView();
+}
+
+// Verificación estricta: ¿La venta pertenece a un turno que ya fue cerrado?
+function isSaleFromClosedShift(sale){
+    if(!sale) return false;
+    // Si no hay turno abierto actualmente, todas las ventas previas están cerradas
+    if(!currentShift || currentShift.status !== 'open') return true;
+
+    // Si la venta tiene shiftId explícito:
+    if(sale.shiftId){
+        // Pertenece al turno actual activo
+        if(sale.shiftId === currentShift.id) return false;
+        // Pertenece a un turno diferente (cerrado)
+        return true;
+    }
+
+    // Fallback para ventas sin shiftId por compatibilidad previa:
+    if(currentShift.openedAt && new Date(sale.date) < new Date(currentShift.openedAt)){
+        return true;
+    }
+
+    return false;
+}
 
 function updateShiftUI(){
     const pill = document.getElementById('shift-status-pill');
@@ -13,26 +73,42 @@ function updateShiftUI(){
     const btnCutX = document.getElementById('btn-shift-cutx');
     const btnCutZ = document.getElementById('btn-shift-cutz');
 
-    if(!pill) return;
+    const btnVOpen = document.getElementById('btn-shifts-view-open');
+    const btnVCutX = document.getElementById('btn-shifts-view-cutx');
+    const btnVCutZ = document.getElementById('btn-shifts-view-cutz');
 
-    if(currentShift && currentShift.status === 'open'){
-        pill.className = 'pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-xs font-semibold flex items-center gap-1.5';
-        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Turno Abierto';
-        if(info) info.textContent = `Cajero: @${currentShift.cashierUsername} · Fondo: ${fmt(currentShift.initialCashFloat)} · Inicio: ${formatAppDate(currentShift.openedAt, {hour:'2-digit', minute:'2-digit'})}`;
-        if(btnOpen) btnOpen.classList.add('hidden');
-        if(btnCutX) btnCutX.classList.remove('hidden');
-        if(btnCutZ) btnCutZ.classList.remove('hidden');
-    } else {
-        pill.className = 'pill bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold flex items-center gap-1.5';
-        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-500"></span>Sin Turno Activo';
-        if(info) info.textContent = 'Abre turno con fondo de caja para registrar ventas';
-        if(btnOpen) btnOpen.classList.remove('hidden');
-        if(btnCutX) btnCutX.classList.add('hidden');
-        if(btnCutZ) btnCutZ.classList.add('hidden');
+    const isOpen = currentShift && currentShift.status === 'open';
+
+    if(pill){
+        if(isOpen){
+            pill.className = 'pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-xs font-semibold flex items-center gap-1.5';
+            pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>Turno Abierto';
+            if(info) info.textContent = `Cajero: @${currentShift.cashierUsername} · Fondo: ${fmt(currentShift.initialCashFloat)} · Inicio: ${formatAppDate(currentShift.openedAt, {hour:'2-digit', minute:'2-digit'})}`;
+            if(btnOpen) btnOpen.classList.add('hidden');
+            if(btnCutX) btnCutX.classList.remove('hidden');
+            if(btnCutZ) btnCutZ.classList.remove('hidden');
+        } else {
+            pill.className = 'pill bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold flex items-center gap-1.5';
+            pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-500"></span>Sin Turno Activo';
+            if(info) info.textContent = 'Abre turno con fondo de caja para registrar ventas';
+            if(btnOpen) btnOpen.classList.remove('hidden');
+            if(btnCutX) btnCutX.classList.add('hidden');
+            if(btnCutZ) btnCutZ.classList.add('hidden');
+        }
     }
+
+    if(btnVOpen) btnVOpen.classList.toggle('hidden', isOpen);
+    if(btnVCutX) btnVCutX.classList.toggle('hidden', !isOpen);
+    if(btnVCutZ) btnVCutZ.classList.toggle('hidden', !isOpen);
+
+    if(typeof renderShiftsHistoryView === 'function') renderShiftsHistoryView();
 }
 
 function promptOpenShift(){
+    if(currentShift && currentShift.status === 'open'){
+        alert(`Ya hay un turno abierto actualmente por @${currentShift.cashierUsername}.\nPara iniciar un nuevo turno, primero realiza el Corte Z (Cierre).`);
+        return;
+    }
     const m = document.getElementById('shift-open-modal');
     if(m) {
         const inp = document.getElementById('shift-initial-cash');
@@ -47,6 +123,12 @@ function closeShiftOpenModal(){
 }
 
 function confirmOpenShift(){
+    if(currentShift && currentShift.status === 'open'){
+        alert(`Ya existe un turno abierto. Debes realizar el Corte Z antes de abrir otro.`);
+        closeShiftOpenModal();
+        return;
+    }
+
     const input = document.getElementById('shift-initial-cash');
     const amount = parseFloat(input ? input.value : 0) || 0;
     currentShift = {
@@ -59,6 +141,7 @@ function confirmOpenShift(){
         initialCashFloat: amount,
         status: 'open'
     };
+    localStorage.setItem('pos_current_shift', JSON.stringify(currentShift));
     if (window.FirebaseService && window.FirebaseService.stats) {
         window.FirebaseService.stats.saveCurrentShift(currentShift).catch(console.warn);
     }
@@ -72,7 +155,7 @@ function computeShiftCutX(){
     if(!currentShift) return null;
     const shiftSales = salesLog.filter(s => 
         s.status === 'completed' && 
-        new Date(s.date) >= new Date(currentShift.openedAt) &&
+        (s.shiftId === currentShift.id || (!s.shiftId && new Date(s.date) >= new Date(currentShift.openedAt))) &&
         (currentUser.role === 'admin' || currentUser.role === 'supervisor' || s.cashierId === currentShift.cashierId)
     );
 
@@ -171,9 +254,17 @@ function confirmCloseShiftZ(){
     currentShift.expectedCash = data.expectedCashInDrawer;
     currentShift.discrepancy = discrepancy;
     currentShift.totalSales = data.totalSales;
+    currentShift.salesCount = data.salesCount;
+    currentShift.cashSales = data.cashSales;
+    currentShift.cardSales = data.cardSales;
+    currentShift.transferSales = data.transferSales;
     currentShift.status = 'closed';
 
-    shiftsHistory.push(currentShift);
+    // Guardar en histórico ordenado (más reciente primero)
+    shiftsHistory.unshift({ ...currentShift });
+    localStorage.setItem('pos_shifts_history', JSON.stringify(shiftsHistory));
+    localStorage.removeItem('pos_current_shift');
+
     if (window.FirebaseService && window.FirebaseService.stats) {
         window.FirebaseService.stats.saveShiftsHistory(shiftsHistory).catch(console.warn);
         window.FirebaseService.stats.saveCurrentShift(null).catch(console.warn);
@@ -191,7 +282,196 @@ Diferencia: ${(discrepancy >= 0 ? '+' : '') + fmt(discrepancy)}`);
     closeCutZModal();
     updateShiftUI();
     upPosSummary();
+    if(typeof renderShiftsHistoryView === 'function') renderShiftsHistoryView();
 }
+
+// ===== RENDERIZADO DEL HISTORIAL DE TURNOS & CORTES DE CAJA =====
+function renderShiftsHistoryView(){
+    const activeCont = document.getElementById('shifts-active-container');
+    const histList = document.getElementById('shifts-history-list');
+    const countBadge = document.getElementById('shifts-count-badge');
+
+    if(!activeCont || !histList) return;
+
+    // 1. Estado del turno activo actual
+    if(currentShift && currentShift.status === 'open'){
+        const data = computeShiftCutX();
+        activeCont.innerHTML = `
+            <div class="glass rounded-xl p-4 border border-emerald-500/35 bg-gradient-to-br from-emerald-500/10 via-slate-900/60 to-slate-950">
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-3 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <span class="pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 text-xs font-bold flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>TURNO ACTUAL EN CURSO
+                        </span>
+                        <span class="font-mono text-xs text-slate-400">#${currentShift.id}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="showCutXModal()" class="pos-btn bg-sky-600 hover:bg-sky-500 text-white text-xs py-1.5 px-3">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>Corte X
+                        </button>
+                        <button onclick="showCutZModal()" class="pos-btn bg-amber-600 hover:bg-amber-500 text-white text-xs py-1.5 px-3">
+                            <i data-lucide="check-square" class="w-3.5 h-3.5"></i>Corte Z (Cierre)
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Cajero</span>
+                        <b class="text-white text-sm">@${currentShift.cashierUsername}</b>
+                        <span class="text-[10px] text-slate-400 block truncate">${currentShift.cashierName}</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Apertura</span>
+                        <b class="text-white text-sm mono">${formatAppDate(currentShift.openedAt, {hour:'2-digit', minute:'2-digit'})}</b>
+                        <span class="text-[10px] text-slate-400 block">${formatAppDate(currentShift.openedAt, {day:'numeric', month:'short'})}</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Fondo Inicial</span>
+                        <b class="text-emerald-400 text-sm mono">${fmt(currentShift.initialCashFloat)}</b>
+                        <span class="text-[10px] text-slate-500 block">En caja registradora</span>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Vendido</span>
+                        <b class="text-sky-400 text-sm mono">${fmt(data ? data.totalSales : 0)}</b>
+                        <span class="text-[10px] text-slate-400 block">${data ? data.salesCount : 0} ticket(s)</span>
+                    </div>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <span class="text-slate-400">Efec: <b class="text-emerald-400 mono">${fmt(data ? data.cashSales : 0)}</b></span>
+                        <span class="text-slate-400">Tarj: <b class="text-sky-400 mono">${fmt(data ? data.cardSales : 0)}</b></span>
+                        <span class="text-slate-400">Transf: <b class="text-purple-400 mono">${fmt(data ? data.transferSales : 0)}</b></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-slate-400 font-medium">Efectivo esperado en gaveta:</span>
+                        <span class="text-base font-bold mono text-emerald-400">${fmt(data ? data.expectedCashInDrawer : currentShift.initialCashFloat)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        activeCont.innerHTML = `
+            <div class="glass rounded-xl p-5 border border-slate-800 text-center flex flex-col items-center justify-center gap-2.5">
+                <div class="w-12 h-12 rounded-xl bg-slate-800/90 text-slate-400 flex items-center justify-center">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </div>
+                <h4 class="text-sm font-bold text-white">Sin Turno Activo en Caja</h4>
+                <p class="text-xs text-slate-400 max-w-md">Para poder registrar cobros y tickets en el punto de venta, debes abrir un turno de caja indicando el fondo inicial con el que comienzas.</p>
+                <button onclick="promptOpenShift()" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 px-4 shadow-lg shadow-emerald-600/25 mt-1 flex items-center gap-2">
+                    <i data-lucide="play" class="w-4 h-4"></i>Abrir Turno con Fondo Inicial
+                </button>
+            </div>
+        `;
+    }
+
+    // 2. Historial de turnos cerrados
+    if(countBadge) countBadge.textContent = `${shiftsHistory.length} turno(s)`;
+
+    if(!shiftsHistory || shiftsHistory.length === 0){
+        histList.innerHTML = `
+            <div class="text-center py-8 text-slate-500 text-xs bg-slate-900/40 rounded-xl border border-slate-800/60">
+                <i data-lucide="inbox" class="w-6 h-6 mx-auto mb-1.5 opacity-50"></i>
+                No hay turnos cerrados en el historial aún.<br>Cada vez que realices un Corte Z, quedará registrado aquí.
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    histList.innerHTML = shiftsHistory.map(sh => {
+        const diff = sh.discrepancy || 0;
+        let diffBadge = '';
+        if(Math.abs(diff) < 0.5){
+            diffBadge = `<span class="pill bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">Cuadrado (0.00)</span>`;
+        } else if(diff > 0){
+            diffBadge = `<span class="pill bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-mono font-bold">Sobrante +${fmt(diff)}</span>`;
+        } else {
+            diffBadge = `<span class="pill bg-rose-500/20 text-rose-300 border border-rose-500/35 text-[10px] font-mono font-bold">Faltante ${fmt(diff)}</span>`;
+        }
+
+        return `
+            <div class="pos-row flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5">
+                <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold text-white text-xs">${sh.cashierName || 'Cajero'}</span>
+                        <span class="text-[11px] text-slate-400 font-mono">@${sh.cashierUsername || 'caja'}</span>
+                        <span class="pill bg-slate-800 text-slate-300 border border-slate-700 text-[9.5px] font-mono">Folio: ${sh.id}</span>
+                        ${diffBadge}
+                    </div>
+                    <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+                        <span>Apertura: <b class="text-slate-300">${formatAppDate(sh.openedAt)}</b></span>
+                        <span>Cierre: <b class="text-slate-300">${formatAppDate(sh.closedAt)}</b></span>
+                        <span>Fondo: <b class="text-emerald-400 mono">${fmt(sh.initialCashFloat || 0)}</b></span>
+                    </div>
+                    <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap pt-0.5">
+                        <span>Ventas Turno: <b class="text-sky-300 mono">${fmt(sh.totalSales || 0)}</b> (${sh.salesCount || 0} tickets)</span>
+                        <span>Esperado: <b class="text-slate-200 mono">${fmt(sh.expectedCash || 0)}</b></span>
+                        <span>Físico contado: <b class="text-white mono">${fmt(sh.actualCashCount || 0)}</b></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="printShiftCutZTicket('${sh.id}')" class="pos-btn bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs py-1.5 px-3 flex items-center gap-1.5" title="Reimprimir Ticket de Corte Z">
+                        <i data-lucide="printer" class="w-3.5 h-3.5 text-sky-400"></i><span>Ticket Corte Z</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    lucide.createIcons();
+}
+
+// ===== IMPRESIÓN DE TICKET TÉRMICO DE CORTE Z =====
+function printShiftCutZTicket(shiftId){
+    const sh = shiftsHistory.find(s => s.id === shiftId);
+    if(!sh){
+        alert("Turno no encontrado en el historial.");
+        return;
+    }
+
+    const diff = sh.discrepancy || 0;
+    const diffText = (diff >= 0 ? '+' : '') + fmt(diff);
+
+    const ticketHtml = `
+        <div class="tkt-center tkt-bold" style="font-size:14px;letter-spacing:1px">PROCAÑA MOTORS</div>
+        <div class="tkt-center">RFC: XAXX010101000</div>
+        <div class="tkt-center" style="font-size:10px">Sucursal Matriz & Almacén Central · Texcoco, Edo. de México</div>
+        <div class="tkt-divider"></div>
+        <div class="tkt-center tkt-bold" style="font-size:12px;margin:2px 0;">CORTE DE CAJA (CORTE Z)</div>
+        <div class="tkt-divider"></div>
+        <div class="tkt-flex"><span>Folio Turno:</span><span class="tkt-bold">${sh.id}</span></div>
+        <div class="tkt-flex"><span>Cajero:</span><span>${sh.cashierName} (@${sh.cashierUsername})</span></div>
+        <div class="tkt-flex"><span>Apertura:</span><span>${formatAppDate(sh.openedAt)}</span></div>
+        <div class="tkt-flex"><span>Cierre:</span><span>${formatAppDate(sh.closedAt)}</span></div>
+        <div class="tkt-divider"></div>
+        <div class="tkt-flex"><span>Fondo Inicial de Caja:</span><span class="tkt-bold">${fmt(sh.initialCashFloat || 0)}</span></div>
+        <div class="tkt-flex"><span>Ventas en Efectivo:</span><span>${fmt(sh.cashSales || 0)}</span></div>
+        <div class="tkt-flex"><span>Ventas con Tarjeta:</span><span>${fmt(sh.cardSales || 0)}</span></div>
+        <div class="tkt-flex"><span>Ventas por Transferencia:</span><span>${fmt(sh.transferSales || 0)}</span></div>
+        <div class="tkt-flex tkt-bold" style="font-size:12px;margin-top:2px">
+            <span>TOTAL VENTAS:</span><span>${fmt(sh.totalSales || 0)}</span>
+        </div>
+        <div class="tkt-flex"><span>Tickets Emitidos:</span><span>${sh.salesCount || 0}</span></div>
+        <div class="tkt-double-divider"></div>
+        <div class="tkt-flex"><span>Efectivo Esperado en Gaveta:</span><span class="tkt-bold">${fmt(sh.expectedCash || 0)}</span></div>
+        <div class="tkt-flex"><span>Efectivo Físico Contado:</span><span class="tkt-bold">${fmt(sh.actualCashCount || 0)}</span></div>
+        <div class="tkt-divider"></div>
+        <div class="tkt-flex tkt-bold" style="font-size:13px;margin:3px 0;">
+            <span>DIFERENCIA / DESCUADRE:</span><span>${diffText}</span>
+        </div>
+        <div class="tkt-double-divider"></div>
+        <div class="tkt-center" style="font-size:9.5px">COMPROBANTE OFICIAL DE CORTE DE CAJA</div>
+        <div class="tkt-center" style="font-size:9px">Firma Cajero: _________________________</div>
+        <div class="tkt-center" style="font-size:9px">Firma Supervisor: _____________________</div>
+    `;
+
+    const printArea = document.getElementById('thermal-print-area');
+    if(printArea){
+        printArea.innerHTML = ticketHtml;
+        window.print();
+    }
+}
+
 
 
 
