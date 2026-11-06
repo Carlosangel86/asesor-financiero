@@ -1367,11 +1367,11 @@ function openProductDropdown(type) {
     const list = document.getElementById(`${type}-dropdown-list`);
     const chevron = document.getElementById(`${type}-chevron-icon`);
     const wrap = document.getElementById(`${type}-combobox-wrap`);
-    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : null;
+    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : document.getElementById('sec-sell-product');
     if (!list) return;
 
-    if (wrap) wrap.style.zIndex = '50';
-    if (sec) sec.style.zIndex = '50';
+    if (wrap) wrap.style.zIndex = '60';
+    if (sec) sec.style.zIndex = '60';
 
     filterProductDropdown(type);
     list.classList.remove('hidden');
@@ -1385,7 +1385,7 @@ function closeProductDropdown(type) {
     const list = document.getElementById(`${type}-dropdown-list`);
     const chevron = document.getElementById(`${type}-chevron-icon`);
     const wrap = document.getElementById(`${type}-combobox-wrap`);
-    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : null;
+    const sec = type === 'restock' ? document.getElementById('sec-restock-product') : document.getElementById('sec-sell-product');
     if (list) list.classList.add('hidden');
     if (chevron) chevron.style.transform = 'rotate(0deg)';
     if (wrap) wrap.style.zIndex = '';
