@@ -44,49 +44,132 @@ const S={rev:null,cost:null,tax:null,industry:null,loan:null,loanRate:null,loanY
 Chart.defaults.color='#475569';Chart.defaults.font.family='Inter';
 let donut,bars;
 function initCharts(){
-    donut=new Chart(document.getElementById('cDonut'),{type:'doughnut',data:{labels:['Costos','Ganancia'],datasets:[{data:[1,0],backgroundColor:['#1e293b','#0f172a'],borderWidth:0,borderRadius:5}]},options:{cutout:'74%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:false}});
-    bars=new Chart(document.getElementById('cBars'),{type:'bar',data:{labels:['Año 1','Año 2','Año 3'],datasets:[{label:'Flujo Libre',data:[0,0,0],backgroundColor:'rgba(14,165,233,.55)',borderRadius:8,borderSkipped:false},{label:'Deuda',data:[0,0,0],backgroundColor:'rgba(244,63,94,.4)',borderRadius:8,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{grid:{display:false},border:{display:false}},y:{ticks:{callback:v=>fmtS(v)},grid:{color:'rgba(51,65,85,.4)'},border:{display:false}}}}});
+    const elDonut = document.getElementById('cDonut');
+    if(elDonut && !donut) {
+        donut=new Chart(elDonut,{type:'doughnut',data:{labels:['Costos','Ganancia'],datasets:[{data:[1,0],backgroundColor:['#1e293b','#0f172a'],borderWidth:0,borderRadius:5}]},options:{cutout:'74%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:false}});
+    }
+    const elBars = document.getElementById('cBars');
+    if(elBars && !bars) {
+        bars=new Chart(elBars,{type:'bar',data:{labels:['Año 1','Año 2','Año 3'],datasets:[{label:'Flujo Libre',data:[0,0,0],backgroundColor:'rgba(14,165,233,.55)',borderRadius:8,borderSkipped:false},{label:'Deuda',data:[0,0,0],backgroundColor:'rgba(244,63,94,.4)',borderRadius:8,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{grid:{display:false},border:{display:false}},y:{ticks:{callback:v=>fmtS(v)},grid:{color:'rgba(51,65,85,.4)'},border:{display:false}}}}});
+    }
 }
 initCharts();
 
-function showAdvTab(t){['dash','ratios','back','amor'].forEach(n=>{document.getElementById('v-'+n).classList.toggle('hidden',n!==t);const b=document.getElementById('t-'+n);n===t?(b.classList.add('tab-on'),b.classList.remove('text-slate-500')):(b.classList.remove('tab-on'),b.classList.add('text-slate-500'));});}
+function showAdvTab(t){['dash','ratios','back','amor'].forEach(n=>{const vn=document.getElementById('v-'+n);if(vn)vn.classList.toggle('hidden',n!==t);const b=document.getElementById('t-'+n);if(b){n===t?(b.classList.add('tab-on'),b.classList.remove('text-slate-500')):(b.classList.remove('tab-on'),b.classList.add('text-slate-500'));}});}
 
-function setHints(a){document.getElementById('hints').innerHTML=a.map(h=>`<button onclick="useH(\`${h.t}\`)" class="whitespace-nowrap px-3 py-2 rounded-full bg-slate-800/70 hover:bg-slate-700 border border-slate-700/60 text-[11px] text-slate-300 transition shadow flex items-center gap-1.5 shrink-0"><i data-lucide="zap" class="w-3 h-3 text-sky-500"></i>${h.l}</button>`).join('');lucide.createIcons();}
+function setHints(a){const hEl=document.getElementById('hints');if(!hEl)return;hEl.innerHTML=a.map(h=>`<button onclick="useH(\`${h.t}\`)" class="whitespace-nowrap px-3 py-2 rounded-full bg-slate-800/70 hover:bg-slate-700 border border-slate-700/60 text-[11px] text-slate-300 transition shadow flex items-center gap-1.5 shrink-0"><i data-lucide="zap" class="w-3 h-3 text-sky-500"></i>${h.l}</button>`).join('');if(typeof lucide!=='undefined'&&lucide.createIcons)lucide.createIcons();}
 function updateInitialHints(){
     const hints=[
         {l:'Ej: Ventas 500k, costos 430k',t:'Mis ingresos son de 500 mil pesos al mes y mis costos operativos suman unos 430 mil.'},
-        {l:'⚖️ Régimen Fiscal (Gemma 4)',t:'¿Qué régimen fiscal me conviene escoger según las actividades de mi negocio?'}
+        {l:'⚖️ Régimen Fiscal (Gemini / Gemma)',t:'¿Qué régimen fiscal me conviene escoger según las actividades de mi negocio?'}
     ];
-    const posData=getPosFinancials();
-    if(posData)hints.unshift({l:'⚡ Importar datos del POS',t:'__POS_SYNC__'});
+    try {
+        const posData = typeof getPosFinancials === 'function' ? getPosFinancials() : null;
+        if(posData) hints.unshift({l:'⚡ Importar datos del POS',t:'__POS_SYNC__'});
+    } catch(e) {
+        console.warn('[getPosFinancials no disponible al inicio]', e);
+    }
     setHints(hints);
 }
 updateInitialHints();
-function useH(t){if(!busy){if(t==='__POS_SYNC__'){syncFromPos();return;}document.getElementById('msg').value=t;sendAdv();}}
+function useH(t){if(!busy){if(t==='__POS_SYNC__'){syncFromPos();return;}const mEl=document.getElementById('msg');if(mEl)mEl.value=t;sendAdv();}}
 
 async function sendAdv(){
-    if(busy)return;const el=document.getElementById('msg'),txt=el.value.trim();if(!txt)return;
-    busy=true;document.getElementById('iw').classList.add('lock');document.getElementById('hints').innerHTML='';
-    addMsg(txt,'u');el.value='';document.getElementById('typ').classList.remove('hidden');
+    if(busy)return;
+    const el=document.getElementById('msg');
+    const txt=el?el.value.trim():'';
+    if(!txt)return;
+    busy=true;
+    const iw=document.getElementById('iw');
+    if(iw)iw.classList.add('lock');
+    const hEl=document.getElementById('hints');
+    if(hEl)hEl.innerHTML='';
+    addMsg(txt,'u');
+    if(el)el.value='';
+    const typ=document.getElementById('typ');
+    if(typ)typ.classList.remove('hidden');
     try{
-        alog('NLP Extraction');await phase('Orch','EXTRACTING','bg-indigo-500',700);parse(txt);
-        document.getElementById('oJ').textContent=JSON.stringify(S,null,2);upQ();st('Orch','EXTRACTED','bg-emerald-600');
-        await phase('Eng','CALCULATING','bg-amber-500',500);const R=calc();
-        document.getElementById('oM').textContent=JSON.stringify(R,null,2);st('Eng','DONE','bg-emerald-600');upDash(R);upRatios(R);
-        alog('Narrating');await slp(500);document.getElementById('typ').classList.add('hidden');
-        addMsg(narrate(R),'b');advStep();saveAdv(R);
+        alog('NLP Extraction');
+        await phase('Orch','EXTRACTING','bg-indigo-500',700);
+        parse(txt);
+        const oJ=document.getElementById('oJ');
+        if(oJ)oJ.textContent=JSON.stringify(S,null,2);
+        upQ();
+        st('Orch','EXTRACTED','bg-emerald-600');
+
+        await phase('Eng','CALCULATING','bg-amber-500',500);
+        const R=calc();
+        const oM=document.getElementById('oM');
+        if(oM)oM.textContent=JSON.stringify(R,null,2);
+        st('Eng','DONE','bg-emerald-600');
+
+        try { upDash(R); } catch(de){ console.warn('[upDash warn]', de); }
+        try { upRatios(R); } catch(re){ console.warn('[upRatios warn]', re); }
+
+        alog('Narrating');
+        await slp(500);
+        if(typ)typ.classList.add('hidden');
+        addMsg(narrate(R),'b');
+        try { advStep(); } catch(ae){ console.warn('[advStep warn]', ae); }
+        try { saveAdv(R); } catch(se){ console.warn('[saveAdv warn]', se); }
 
         // Check if query is about tax regime or fiscal advice
         const lo = txt.toLowerCase();
         const isFiscal = lo.match(/r[eé]gimen|fiscal|sat|impuesto|tributar|persona\s*moral|persona\s*f[ií]sica|resico|qu[eé]\s*me\s*conviene|qu[eé]\s*r[eé]gimen/);
         if(isFiscal){
-            askGemmaFiscal(txt, R, S);
+            await askGemmaFiscal(txt, R, S);
         } else {
-            // Call local LLM qwen2.5 for general financial suggestions
-            askOllama(txt, R, S);
+            // Call AI (OpenRouter with Gemini 3.8 Flash / Ollama)
+            await askOllama(txt, R, S);
         }
-    }catch(e){alog('[ERR] '+e.message);document.getElementById('typ').classList.add('hidden');addMsg('Error. Revisa logs.','b');}
-    finally{busy=false;document.getElementById('iw').classList.remove('lock');}
+    }catch(e){
+        console.error('[sendAdv error]', e);
+        alog('[ERR] '+e.message);
+        if(typ)typ.classList.add('hidden');
+        addMsg(`<div class="text-rose-400 text-xs">⚠️ Error en el procesamiento: ${e.message}</div>`,'b');
+    }
+    finally{
+        busy=false;
+        if(iw)iw.classList.remove('lock');
+    }
+}
+
+// ===== LLM & ASISTENTE INTELIGENTE (OPENROUTER / OLLAMA) =====
+
+async function callOpenRouterAI(messages, model) {
+    const config = window.AI_CONFIG || {};
+    const apiKey = config.apiKey || localStorage.getItem('openrouter_api_key') || '';
+    if (!apiKey) return null;
+
+    const targetModel = model || config.model || 'google/gemini-3.8-flash';
+    const siteUrl = config.siteUrl || window.location.origin;
+    const siteName = config.siteName || 'Procaña Motors - Asesor Financiero';
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey.trim()}`,
+            'HTTP-Referer': siteUrl,
+            'X-Title': siteName
+        },
+        body: JSON.stringify({
+            model: targetModel,
+            messages: messages,
+            temperature: 0.4
+        })
+    });
+
+    if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || `Error HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+        text: data?.choices?.[0]?.message?.content || 'Sin respuesta del modelo.',
+        model: data?.model || targetModel
+    };
 }
 
 async function askOllama(userText, R, S) {
@@ -109,6 +192,27 @@ Instrucciones:
 2. Si un dato está restringido por políticas de seguridad, respétalo y asesora dentro de su alcance operativo.
 3. Responde de forma concisa. Formatea tu respuesta en HTML simple (usa <b>, <br>, <ul>, <li>) para que se vea bien en un chat. NO uses formato markdown ni bloques de código.`;
 
+    // 1. Intentar con OpenRouter si la API Key está configurada
+    const config = window.AI_CONFIG || {};
+    const hasOpenRouter = (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
+    if (hasOpenRouter) {
+        try {
+            const aiRes = await callOpenRouterAI([
+                { role: 'system', content: 'Eres el asesor financiero inteligente de Procaña Motors en México. Responde siempre de forma concisa, profesional y en formato HTML simple (usa <b>, <br>, <ul>, <li>, <p>). NUNCA uses formato markdown ni bloques de código ```.' },
+                { role: 'user', content: prompt }
+            ], config.model || 'google/gemini-3.8-flash');
+
+            if (aiRes) {
+                document.getElementById('typ').classList.add('hidden');
+                addMsg(`<div class="mt-2 pt-3 border-t border-sky-500/20 text-[13px] text-sky-100/90 leading-relaxed"><div class="flex items-center gap-1.5 mb-2 text-sky-400 font-bold uppercase tracking-wider text-[10px]"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Análisis Inteligente (OpenRouter · ${aiRes.model})</div>${aiRes.text}</div>`, 'b');
+                lucide.createIcons();
+                return;
+            }
+        } catch (openRouterErr) {
+            console.warn('[OpenRouter Error, intentando fallback a Ollama]', openRouterErr);
+        }
+    }
+
     try {
         const response = await fetch('http://localhost:11434/api/generate', {
             method: 'POST',
@@ -125,7 +229,7 @@ Instrucciones:
         lucide.createIcons();
     } catch (e) {
         document.getElementById('typ').classList.add('hidden');
-        addMsg('<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a Ollama local (qwen2.5).</div>', 'b');
+        addMsg('<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. Asegúrate de configurar tu API Key de OpenRouter en js/api-config.js o encender Ollama local.</div>', 'b');
         lucide.createIcons();
     }
 }
@@ -136,7 +240,7 @@ async function askGemmaFiscal(activityText, R, S) {
         document.getElementById('typ').classList.add('hidden');
         addMsg(`<div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed fin">
             <div class="flex items-center gap-2 mb-1.5 font-bold text-amber-400">
-                <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>Acceso Restringido — Consultas Fiscales Gemma 4:12B
+                <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>Acceso Restringido — Consultas Fiscales
             </div>
             El módulo de asesoría tributaria y determinación de régimen fiscal está reservado exclusivamente para los roles de <b>Administrador</b> y <b>Analista Financiero</b>. Tu rol actual (<b>${currentUser ? currentUser.role : 'Sin sesión'}</b>) no cuenta con privilegios para esta operación.
         </div>`, 'b');
@@ -144,7 +248,7 @@ async function askGemmaFiscal(activityText, R, S) {
         return;
     }
     document.getElementById('typ').classList.remove('hidden');
-    alog('Consultando recomendación fiscal a Gemma 4 (12B)');
+    alog('Consultando recomendación fiscal');
     
     const salesInfo = S && S.rev ? `$${fmt(S.rev)}/mes ($${fmt(S.rev * 12)}/año)` : 'No especificado aún';
     const costsInfo = S && S.cost ? `$${fmt(S.cost)}/mes` : 'No especificado aún';
@@ -168,6 +272,45 @@ INSTRUCCIONES CLAVE:
    - Ventajas fiscales (tasas de ISR estimadas, retenciones, deducciones).
    - Qué riesgos o desventajas debe cuidar.
 3. Formatea tu respuesta usando HTML simple (<b>, <br>, <ul>, <li>, <p>) para que se vea perfectamente estilizado en el chat. NO uses markdown ni comillas triples ni bloques de código. Sé conciso, profesional y directo.`;
+
+    // 1. Intentar con OpenRouter si la API Key está configurada
+    const config = window.AI_CONFIG || {};
+    const hasOpenRouter = (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
+    if (hasOpenRouter) {
+        try {
+            const aiRes = await callOpenRouterAI([
+                { role: 'system', content: 'Eres un asesor fiscal y tributario experto de alto nivel en México (SAT). Responde de forma clara, didáctica y en formato HTML simple (usa <b>, <br>, <ul>, <li>, <p>). NUNCA uses formato markdown ni bloques de código ```.' },
+                { role: 'user', content: prompt }
+            ], config.model || 'google/gemini-3.8-flash');
+
+            if (aiRes) {
+                document.getElementById('typ').classList.add('hidden');
+                let html = `
+                <div class="mt-2 pt-3 border-t border-indigo-500/30 text-[13px] text-indigo-100/90 leading-relaxed">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-1.5 text-indigo-400 font-bold uppercase tracking-wider text-[10px]">
+                            <span class="w-5 h-5 rounded bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-[9px] border border-indigo-500/40">SAT</span>
+                            <i data-lucide="scale" class="w-3.5 h-3.5"></i> Asesor Fiscal · OpenRouter (${aiRes.model})
+                        </div>
+                    </div>
+                    <div class="space-y-2 mb-3">
+                        ${aiRes.text}
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-indigo-950/60 border border-indigo-500/20 flex flex-wrap items-center gap-1.5">
+                        <span class="text-[9.5px] text-slate-400 font-bold uppercase mr-1">Aplicar al perfil:</span>
+                        <button onclick="applyTaxRegime('RESICO')" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] py-1 px-2.5"><i data-lucide="check" class="w-3 h-3"></i>RESICO (2.5%)</button>
+                        <button onclick="applyTaxRegime('PERSONA_MORAL')" class="pos-btn bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] py-1 px-2.5"><i data-lucide="check" class="w-3 h-3"></i>Persona Moral (30%)</button>
+                        <button onclick="applyTaxRegime('PERSONA_FISICA')" class="pos-btn bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] py-1 px-2.5"><i data-lucide="check" class="w-3 h-3"></i>Persona Física (35%)</button>
+                    </div>
+                </div>`;
+                addMsg(html, 'b');
+                lucide.createIcons();
+                return;
+            }
+        } catch (openRouterErr) {
+            console.warn('[OpenRouter Fiscal Error, intentando fallback a Ollama]', openRouterErr);
+        }
+    }
 
     try {
         const response = await fetch('http://localhost:11434/api/generate', {
@@ -205,7 +348,7 @@ INSTRUCCIONES CLAVE:
         lucide.createIcons();
     } catch (e) {
         document.getElementById('typ').classList.add('hidden');
-        addMsg(`<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a Ollama local para <b>gemma4:12b</b>. Verifica que Ollama esté corriendo con <code>$env:OLLAMA_ORIGINS="*"</code> y <code>ollama serve</code>.</div>`, 'b');
+        addMsg(`<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. Asegúrate de configurar tu API Key de OpenRouter en js/api-config.js o encender Ollama local.</div>`, 'b');
         lucide.createIcons();
     }
 }
@@ -360,7 +503,12 @@ function upDash(R){mSet('m-ebitda',R.cf.ebitda);mSet('m-ev',R.val.ev);
     }if(S.rev&&S.cost){const mg=((S.rev-S.cost)/S.rev*100);const el=document.getElementById('m-margin');el.textContent=mg.toFixed(1)+'%';el.className='text-xl font-bold mono '+(mg>20?'text-emerald-400':mg>10?'text-amber-400':'text-rose-400');document.getElementById('donutC').textContent=mg.toFixed(0)+'%';donut.data.datasets[0].data=[S.cost,S.rev-S.cost];donut.data.datasets[0].backgroundColor=['#ef4444','#0ea5e9'];donut.update();}if(R.debt.dscr!==null&&S.loan>0){const pb=R.cf.fcff>0?S.loan/R.cf.fcff:99;const el=document.getElementById('m-payback');el.textContent=pb>0&&pb<50?pb.toFixed(1)+' años':'—';el.className='text-xl font-bold mono '+(pb<4?'text-emerald-400':pb<7?'text-amber-400':'text-rose-400');}if(R.proj.y1!==null){bars.data.datasets[0].data=[R.proj.y1,R.proj.y2,R.proj.y3];bars.data.datasets[1].data=R.debt.pmt?[R.debt.pmt,R.debt.pmt,R.debt.pmt]:[0,0,0];bars.update();}if(R.debt.dscr!==null){const cl=Math.min(Math.max(R.debt.dscr,0),3),pct=(cl/3)*100;document.getElementById('garc').style.strokeDasharray=pct+',100';document.getElementById('garc').style.stroke=R.debt.dscr>1.25?'#10b981':R.debt.dscr>=1?'#f59e0b':'#ef4444';document.getElementById('gVal').textContent=R.debt.dscr.toFixed(2);document.getElementById('gVal').className='text-2xl font-bold mono '+(R.debt.dscr>1.25?'text-emerald-400':R.debt.dscr>=1?'text-amber-400':'text-rose-400');document.getElementById('gLbl').textContent=R.debt.dscr>1.25?'Saludable':R.debt.dscr>=1?'Ajustado':'Riesgo Alto';document.getElementById('gLbl').className='mt-3 text-[10px] font-bold uppercase tracking-wider '+(R.debt.dscr>1.25?'text-emerald-400':R.debt.dscr>=1?'text-amber-400':'text-rose-400');}if(R.amort){let h=`<table class="w-full text-[12px]"><thead><tr class="text-left text-slate-400 border-b border-slate-700/60"><th class="py-2 px-3">Año</th><th class="py-2 px-3 text-right">Pago</th><th class="py-2 px-3 text-right">Intereses</th><th class="py-2 px-3 text-right">Capital</th><th class="py-2 px-3 text-right">Saldo</th></tr></thead><tbody>`;R.amort.rows.forEach(r=>{h+=`<tr class="border-b border-slate-800/40 hover:bg-slate-800/30"><td class="py-2 px-3 text-slate-300">${r.y}</td><td class="py-2 px-3 text-right mono">${fmt(r.pmt)}</td><td class="py-2 px-3 text-right mono text-rose-400">${fmt(r.int)}</td><td class="py-2 px-3 text-right mono text-sky-400">${fmt(r.cap)}</td><td class="py-2 px-3 text-right mono">${fmt(r.bal)}</td></tr>`;});h+='</tbody></table>';document.getElementById('amTbl').innerHTML=h;}}
 // Razones panel update
 let radarChart;
-function initRadar(){if(radarChart)radarChart.destroy();radarChart=new Chart(document.getElementById('cRadar'),{type:'radar',data:{labels:['Margen Bruto','Margen Neto','Eficiencia','DSCR','ROI','Cobertura Int.'],datasets:[{label:'Tu Negocio',data:[0,0,0,0,0,0],backgroundColor:'rgba(14,165,233,.15)',borderColor:'rgba(14,165,233,.7)',pointBackgroundColor:'#0ea5e9',pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(51,65,85,.4)'},pointLabels:{color:'#94a3b8',font:{size:10}}}}}});}
+function initRadar(){
+    const elRadar = document.getElementById('cRadar');
+    if(!elRadar) return;
+    if(radarChart) try { radarChart.destroy(); } catch(e){}
+    radarChart=new Chart(elRadar,{type:'radar',data:{labels:['Margen Bruto','Margen Neto','Eficiencia','DSCR','ROI','Cobertura Int.'],datasets:[{label:'Tu Negocio',data:[0,0,0,0,0,0],backgroundColor:'rgba(14,165,233,.15)',borderColor:'rgba(14,165,233,.7)',pointBackgroundColor:'#0ea5e9',pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{beginAtZero:true,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(51,65,85,.4)'},pointLabels:{color:'#94a3b8',font:{size:10}}}}}});
+}
 initRadar();
 
 // Render KaTeX formulas
@@ -411,9 +559,11 @@ function upRatios(R){
     const payEl=document.getElementById('r-pay');if(ra.payback!==null){payEl.className='text-lg font-bold mono '+(ra.payback<4?'text-emerald-400':ra.payback<7?'text-amber-400':'text-rose-400');}
     const effEl=document.getElementById('r-eff');if(ra.efficiency!==null){effEl.textContent=ra.efficiency.toFixed(1)+'%';effEl.className='text-lg font-bold mono '+(ra.efficiency<70?'text-emerald-400':ra.efficiency<85?'text-amber-400':'text-rose-400');}
     // Radar
-    const norm=(v,max)=>v===null?0:Math.min(Math.max(v/max*100,0),100);
-    radarChart.data.datasets[0].data=[norm(ra.grossMargin,50),norm(ra.netMargin,40),norm(100-ra.efficiency,60),norm(R.debt.dscr,3)*1,norm(ra.roi,50),norm(ra.interestCoverage,8)];
-    radarChart.update();
+    if(radarChart && radarChart.data && radarChart.data.datasets && radarChart.data.datasets[0]){
+        const norm=(v,max)=>v===null?0:Math.min(Math.max(v/max*100,0),100);
+        radarChart.data.datasets[0].data=[norm(ra.grossMargin,50),norm(ra.netMargin,40),norm(100-ra.efficiency,60),norm(R.debt.dscr,3)*1,norm(ra.roi,50),norm(ra.interestCoverage,8)];
+        radarChart.update();
+    }
     // Extra cards
     mSet('r-ebitda2',R.cf.ebitda);mSet('r-ev2',R.val.ev);
     if(R.debt.pmt!==null){const pmtEl=document.getElementById('r-pmt');pmtEl.textContent=fmt(R.debt.pmt);pmtEl.className='text-lg font-bold mono text-sky-400';}

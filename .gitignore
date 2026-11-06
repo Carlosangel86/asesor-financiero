@@ -1,2 +1,10 @@
 .firebase/
 .DS_Store
+
+# Secretos y claves de API privadas (nunca subir a Git)
+js/api-config.js
+*.local.js
+.env
+.env.*
+config.js
+

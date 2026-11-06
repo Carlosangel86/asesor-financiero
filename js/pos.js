@@ -3274,4 +3274,31 @@ function showPosTab(t){
 
 function exportPosDB(){const db={version:'1.0.0',exported:new Date().toISOString(),catalog,sales:salesLog,expenses};dl(db,'cfo_copilot_pos_database.json');toast('pos-toast');}
 
+function getPosFinancials(){
+    const allSales=JSON.parse(localStorage.getItem('pos_sales')||'[]');
+    const ex=JSON.parse(localStorage.getItem('pos_expenses')||'[]');
+    const sl = allSales.filter(s => s.status !== 'cancelled');
+    if(sl.length===0)return null;
+    const daySet=new Set();
+    let totalRev=0,totalCogs=0,totalExp=0;
+    sl.forEach(s=>{daySet.add(new Date(s.date).toDateString());totalRev+=s.total;totalCogs+=s.totalCost;});
+    ex.forEach(e=>{totalExp+=e.amount;});
+    const daysWithData=daySet.size;
+    if(daysWithData===0)return null;
+    const dailyAvgRev=totalRev/daysWithData;
+    const dailyAvgCost=(totalCogs+totalExp)/daysWithData;
+    return {
+        totalSales:sl.length,
+        daysWithData,
+        totalRevenue:totalRev,
+        totalCogs,
+        totalExpenses:totalExp,
+        dailyAvgRev,
+        dailyAvgCost,
+        avgRevenue:Math.round(dailyAvgRev*30),
+        avgCost:Math.round(dailyAvgCost*30)
+    };
+}
+if(typeof window !== 'undefined') window.getPosFinancials = getPosFinancials;
+
 
