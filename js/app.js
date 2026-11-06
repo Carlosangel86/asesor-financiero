@@ -31,6 +31,9 @@ function goTo(v){
         if(el) el.classList.toggle('hidden', n !== v);
     });
 
+    // Recordar la vista actual para restaurarla al recargar la página
+    try { sessionStorage.setItem('procana_last_view', v); } catch(e){}
+
     if(v === 'pos'){
         updateShiftUI();
         const dateEl = document.getElementById('pos-date');
@@ -55,6 +58,35 @@ function goTo(v){
     if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
 }
 
+// ===== RESTAURAR VISTA TRAS RECARGA (F5) =====
+// Verifica permisos sin mostrar modales; si el rol ya no tiene acceso, cae al menú.
+function canAccessViewSilently(v){
+    if(!currentUser) return false;
+    if(v === 'advisor') return hasPermission('finance.view_analysis') || hasPermission('ai.qwen_access') || hasPermission('ai.tax_access');
+    if(v === 'pos') return hasPermission('pos.sell') || hasPermission('catalog.view') || hasPermission('pos.stats_view') || hasPermission('pos.almacen_view') || hasPermission('inventory.view');
+    return v === 'menu';
+}
+
+function canAccessPosTabSilently(mode){
+    if(mode === 'today') return hasPermission('pos.today_view');
+    if(mode === 'stats') return hasPermission('pos.stats_view');
+    if(mode === 'almacen') return hasPermission('pos.almacen_view');
+    return ['shifts', 'invoices'].includes(mode);
+}
+
+function restoreLastView(){
+    let v = 'menu';
+    try { v = sessionStorage.getItem('procana_last_view') || 'menu'; } catch(e){}
+    if(!canAccessViewSilently(v)) v = 'menu';
+    goTo(v);
+
+    if(v === 'pos'){
+        let tab = null;
+        try { tab = sessionStorage.getItem('procana_last_pos_tab'); } catch(e){}
+        if(tab && canAccessPosTabSilently(tab)) showPosViewMode(tab);
+    }
+}
+
 function showPosViewMode(mode){
     if(mode === 'today' && !hasPermission('pos.today_view')){
         showAccessDeniedModal('Tu rol no tiene acceso al corte de caja ni al resumen de hoy.');
@@ -70,6 +102,7 @@ function showPosViewMode(mode){
     }
 
     posViewMode = mode;
+    try { sessionStorage.setItem('procana_last_pos_tab', mode); } catch(e){}
     ['today', 'stats', 'almacen', 'shifts', 'invoices'].forEach(m => {
         const el = document.getElementById('pos-panel-' + m);
         const btn = document.getElementById('btn-pos-' + m);
@@ -407,14 +440,23 @@ function renderBranchMap(){
 }
 
 // ===== INICIALIZACIÓN GLOBAL DEL SISTEMA CON FIREBASE =====
+// Si se restauró el Punto de Venta tras recargar, repintar la pestaña activa ya con los datos cargados
+function refreshRestoredPosTab(){
+    const posView = document.getElementById('view-pos');
+    if (!currentUser || !posView || posView.classList.contains('hidden')) return;
+    if (canAccessPosTabSilently(posViewMode)) showPosViewMode(posViewMode);
+}
+
 async function startApp() {
     if (window.FirebaseService) {
         await initAuthAndUsers();
         if (typeof initPosData === 'function') await initPosData();
+        refreshRestoredPosTab();
     } else {
         window.addEventListener('firebase-initialized', async () => {
             await initAuthAndUsers();
             if (typeof initPosData === 'function') await initPosData();
+            refreshRestoredPosTab();
             if (window.lucide && typeof lucide.createIcons === 'function') {
                 lucide.createIcons();
             }

@@ -2329,41 +2329,33 @@ function renderTicket(){
                 : '';
 
             return `
-        <div class="pos-row flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition mb-1.5 shadow-sm">
-            <div class="flex items-center gap-2.5 flex-1 min-w-0 w-full sm:w-auto">
+        <div class="pos-row flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition mb-1.5 shadow-sm">
+            <div class="flex items-center gap-2.5 flex-1 min-w-0">
                 ${tImgTag}
-                <div class="flex-1 min-w-0">
-                    <div class="text-xs text-white font-bold truncate" title="${t.name}">${t.name}</div>
-                <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                    <span class="mono text-emerald-400 font-medium">${fmt(t.price)} c/u</span>
-                    <span class="text-slate-600">·</span>
-                    <span class="text-slate-300 font-semibold">Lleva: <b class="text-sky-300 font-mono">${t.qty} piezas</b></span>
+                <div class="flex-1 min-w-0 pr-2">
+                    <div class="text-xs text-white font-bold truncate" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</div>
+                    <div class="text-[11px] text-slate-400 mono mt-0.5">${fmt(t.price)} c/u</div>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                <!-- Botón explícito para modificar piezas que se van a llevar -->
-                <button onclick="openModifyTicketQtyModal('${t.id}')" type="button" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-[11px] font-bold transition shadow-sm" title="Modificar número de piezas que se van a llevar (0 para quitar)">
-                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-sky-400"></i><span>Modificar piezas (${t.qty})</span>
-                </button>
-
-                <!-- Control rápido de decremento / incremento -->
-                <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
-                    <button onclick="stepTicketItemDirect('${t.id}', -1)" type="button" class="w-6 h-6 rounded-md hover:bg-slate-800 text-slate-300 hover:text-rose-400 font-bold text-xs flex items-center justify-center transition" title="Quitar 1 pieza (si llega a 0 se elimina)">
+            <div class="flex items-center gap-2.5 shrink-0">
+                <!-- Contador rápido interactivo - / + -->
+                <div class="flex items-center bg-slate-950 border border-slate-700/80 rounded-lg p-0.5 shadow-inner">
+                    <button onclick="stepTicketItemDirect('${t.id}', -1)" type="button" class="w-6 h-6 rounded-md hover:bg-slate-800 text-slate-300 hover:text-rose-400 font-bold text-xs flex items-center justify-center transition cursor-pointer select-none" title="Quitar 1 pieza (0 para eliminar)">
                         −
                     </button>
-                    <span class="text-[11px] font-bold mono text-white px-2">${t.qty}</span>
-                    <button onclick="stepTicketItemDirect('${t.id}', 1)" type="button" class="w-6 h-6 rounded-md hover:bg-slate-800 text-slate-300 hover:text-emerald-400 font-bold text-xs flex items-center justify-center transition" title="Agregar 1 pieza">
+                    <span onclick="openModifyTicketQtyModal('${t.id}')" class="text-xs font-bold mono text-sky-300 px-2.5 min-w-[28px] text-center cursor-pointer hover:underline" title="Clic para escribir cantidad exacta">${t.qty}</span>
+                    <button onclick="stepTicketItemDirect('${t.id}', 1)" type="button" class="w-6 h-6 rounded-md hover:bg-slate-800 text-slate-300 hover:text-emerald-400 font-bold text-xs flex items-center justify-center transition cursor-pointer select-none" title="Agregar 1 pieza">
                         +
                     </button>
                 </div>
 
-                <div class="text-xs mono text-emerald-400 font-bold min-w-[70px] text-right">
+                <div class="text-xs mono text-emerald-400 font-bold min-w-[65px] text-right">
                     ${fmt(t.price * t.qty)}
                 </div>
 
-                <!-- Botón quitar directo -->
-                <button onclick="removeTicketItem('${t.id}')" type="button" class="text-slate-500 hover:text-rose-400 transition p-1 rounded-lg hover:bg-rose-500/10" title="Quitar este producto del ticket">
+                <!-- Botón eliminar producto -->
+                <button onclick="removeTicketItem('${t.id}')" type="button" class="text-slate-500 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-rose-500/10 cursor-pointer" title="Quitar este producto del ticket">
                     <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
             </div>

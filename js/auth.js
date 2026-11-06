@@ -157,7 +157,9 @@ async function initAuthAndUsers(){
 
                 currentUser = found;
                 hideAuthModal();
-                goTo('menu');
+                // Al recargar con sesión activa, regresar a la vista donde estaba el usuario
+                if (typeof restoreLastView === 'function') restoreLastView();
+                else goTo('menu');
             } else {
                 currentUser = null;
                 showAuthModal('login');
@@ -482,6 +484,8 @@ async function logout(){
     }
     currentUser = null;
     sessionStorage.removeItem('cfo_current_user');
+    sessionStorage.removeItem('procana_last_view');
+    sessionStorage.removeItem('procana_last_pos_tab');
     
     // Ocultar vistas de trabajo para proteger datos confidenciales
     ['menu','advisor','pos'].forEach(n => {

@@ -143,7 +143,7 @@ async function callOpenRouterAI(messages, model) {
 
     const targetModel = model || config.model || 'google/gemini-3.8-flash';
     const siteUrl = config.siteUrl || window.location.origin;
-    const siteName = config.siteName || 'Procaña Motors - Asesor Financiero';
+    const siteName = config.siteName || 'Procaña Motors - Finanzas';
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -182,7 +182,7 @@ async function askOllama(userText, R, S) {
     const scopedS = buildScopedFinancialContext(S);
     const scopedR = buildScopedFinancialContext(R);
 
-    let prompt = `Eres el asesor financiero inteligente de Procaña Motors, un negocio de refacciones y servicios automotrices en México.
+    let prompt = `Eres el consultor de análisis financiero inteligente de Procaña Motors, un negocio de refacciones y servicios automotrices en México.
 Se te proporciona la información financiera calculada estrictamente por el sistema (NO inventes números, usa SOLO estos, si algún dato es null significa que falta).
 DATOS DEL USUARIO (CONTEXTO FILTRADO POR ROL ${currentUser ? currentUser.role : 'cajero'}): ${JSON.stringify(scopedS)}
 CÁLCULOS DEL SISTEMA: ${JSON.stringify(scopedR)}
@@ -198,7 +198,7 @@ Instrucciones:
     if (hasOpenRouter) {
         try {
             const aiRes = await callOpenRouterAI([
-                { role: 'system', content: 'Eres el asesor financiero inteligente de Procaña Motors en México. Responde siempre de forma concisa, profesional y en formato HTML simple (usa <b>, <br>, <ul>, <li>, <p>). NUNCA uses formato markdown ni bloques de código ```.' },
+                { role: 'system', content: 'Eres el consultor de análisis financiero inteligente de Procaña Motors en México. Responde siempre de forma concisa, profesional y en formato HTML simple (usa <b>, <br>, <ul>, <li>, <p>). NUNCA uses formato markdown ni bloques de código ```.' },
                 { role: 'user', content: prompt }
             ], config.model || 'google/gemini-3.8-flash');
 
