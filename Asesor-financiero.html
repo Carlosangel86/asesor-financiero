@@ -3,23 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>CFO Copilot — Plataforma Financiera</title>
+<title>Procaña Motors — Plataforma Financiera & POS</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/png" href="img/logo.png">
 </head>
 <body class="flex flex-col h-screen overflow-hidden">
 
 <!-- ===== BARRA DE SESIÓN Y CONTROL DE ACCESO ===== -->
 <header id="global-session-bar" class="w-full flex items-center justify-between px-3 sm:px-5 py-2.5 text-xs shrink-0 relative z-40 bg-slate-900/95 border-b border-slate-800/80 backdrop-blur-xl">
     <div class="flex items-center gap-2 sm:gap-3">
-        <div class="flex items-center gap-2 select-none cursor-default">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="font-bold text-white tracking-wide text-[13px]">CFO Copilot</span>
+        <div class="flex items-center gap-2.5 select-none cursor-default">
+            <img src="img/logo.png" alt="Procaña Motors Logo" class="h-6 sm:h-7 w-auto object-contain shrink-0">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-bold text-white tracking-wide text-[13px] hidden sm:inline">Procaña Motors</span>
         </div>
         <div class="h-4 w-[1px] bg-slate-700/60 mx-1"></div>
         <div id="session-user-badge" class="flex items-center gap-1.5 sm:gap-2">
@@ -30,6 +34,18 @@
     </div>
     
     <div class="flex items-center gap-2">
+        <!-- Acciones del Punto de Venta (Solo visibles en POS) -->
+        <div id="header-pos-actions" class="hidden flex items-center gap-1.5 sm:gap-2">
+            <button id="btn-pos-goto-advisor" onclick="goTo('advisor')" class="pos-btn bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-[11px] font-semibold shadow-lg shadow-sky-600/20 px-2.5 py-1.5 flex items-center gap-1.5" title="Ir a Asesoría Financiera">
+                <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+                <span class="hidden md:inline">Asesor Financiero</span>
+            </button>
+            <button onclick="exportPosDB()" class="text-[11px] text-slate-300 hover:text-emerald-400 flex items-center gap-1 transition bg-slate-800/90 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-700/70" title="Exportar Base de Datos POS">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span class="hidden md:inline">Exportar</span>
+            </button>
+        </div>
+
         <!-- Botón Salir al Menú Principal -->
         <button id="btn-header-back-menu" onclick="goTo('menu')" class="hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-200 text-[11px] font-semibold transition" title="Volver al Menú Principal">
             <i data-lucide="home" class="w-3.5 h-3.5 text-sky-400"></i><span class="hidden sm:inline">Menú</span>
@@ -42,6 +58,54 @@
     </div>
 </header>
 
+
+<!-- ===== MODAL DE UBICACIÓN Y SUCURSAL MATRIZ ===== -->
+<div id="branch-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden" onclick="if(event.target===this) closeBranchModal()">
+    <div class="glass max-w-2xl w-full rounded-2xl p-5 sm:p-6 border border-slate-700/80 shadow-2xl relative text-left fin">
+        <button onclick="closeBranchModal()" class="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Cerrar">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-start justify-between gap-3 mb-4 pr-8">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-600/25 text-white shrink-0">
+                    <i data-lucide="map-pin" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h3 class="text-base font-bold text-white">Procaña Motors — Sucursal Matriz & Almacén</h3>
+                        <span class="pill bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] font-mono flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>ABIERTO
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-0.5">Texcoco / Chapingo, Estado de México · <span class="font-mono text-sky-400">19.4976° N, 98.8909° W</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenedor del Mapa Interactivo -->
+        <div id="branch-map" class="w-full h-80 sm:h-96 rounded-xl overflow-hidden border border-slate-800 relative z-0 shadow-inner bg-slate-950 mb-3"></div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
+            <div class="text-slate-400 space-y-0.5">
+                <div class="flex items-center gap-1.5 text-slate-300 font-medium">
+                    <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>Lunes a Sábado: 8:00 AM a 7:00 PM
+                </div>
+                <div class="text-[11px] text-slate-500">
+                    Mostrador de refacciones, entrega de pedidos y caja registradora.
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="copyBranchCoordinates()" class="pos-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-2 px-3">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i><span id="btn-copy-coords-txt">Copiar GPS</span>
+                </button>
+                <a href="https://www.google.com/maps/search/?api=1&query=19.497626595933546,-98.890946969816" target="_blank" rel="noopener noreferrer" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-3.5 shadow-lg shadow-emerald-600/20 flex items-center gap-1.5">
+                    <i data-lucide="navigation" class="w-3.5 h-3.5"></i><span>Cómo llegar</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- ===== MODAL DE APERTURA DE TURNO ===== -->
 
@@ -305,11 +369,11 @@
     <div class="glass w-full max-w-md rounded-2xl border border-slate-700/70 p-5 sm:p-7 shadow-2xl relative text-left my-auto">
         <!-- Logo Corporativo y Encabezado de Seguridad -->
         <div class="flex items-center gap-3 mb-4 pb-4 border-b border-slate-800/80">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-600/30 shrink-0">
-                <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
+            <div class="p-1.5 rounded-xl bg-slate-900/80 border border-slate-700/60 shadow-lg shrink-0 flex items-center justify-center">
+                <img src="img/logo.png" alt="Procaña Motors" class="h-10 w-auto object-contain">
             </div>
             <div>
-                <h3 class="text-base sm:text-lg font-bold text-white tracking-wide">CFO Copilot — Acceso Seguro</h3>
+                <h3 class="text-base sm:text-lg font-bold text-white tracking-wide">Procaña Motors — Acceso Seguro</h3>
                 <p class="text-xs text-slate-400">Portal Corporativo de Control Financiero y POS</p>
             </div>
         </div>
@@ -440,20 +504,40 @@
 
 
 <!-- ===== MENÚ PRINCIPAL ===== -->
-<div id="view-menu" class="flex-1 flex flex-col overflow-hidden items-center justify-center relative">
+<div id="view-menu" class="flex-1 flex flex-col overflow-y-auto items-center justify-center relative p-6">
 <div class="absolute inset-0 opacity-[0.015] pointer-events-none" style="background-image:radial-gradient(#94a3b8 1px,transparent 1px);background-size:30px 30px"></div>
-<div class="z-10 text-center mb-12 fin">
-    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-5 shadow-xl shadow-sky-600/25"><i data-lucide="brain-circuit" class="text-white w-8 h-8"></i></div>
-    <h1 class="text-3xl font-bold text-white mb-2">CFO Copilot <span class="pill bg-sky-900/60 text-sky-400 border border-sky-800/50 ml-2">Pro v2</span></h1>
-    <p class="text-slate-400 text-sm">Plataforma de Inteligencia Financiera para Pequeños Empresarios</p>
+
+<!-- Tarjetita en Esquina Superior Izquierda: Sucursal Matriz (Abre Ventana Flotante con Mapa) -->
+<div id="menu-card-location" onclick="openBranchModal()" class="absolute top-5 left-5 sm:top-6 sm:left-6 z-20 glass px-3.5 py-2 rounded-xl border border-slate-700/80 hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all hover:scale-105 shadow-lg flex items-center gap-2.5 group fin" title="Clic para ver mapa y localización GPS">
+    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30 shrink-0 group-hover:scale-105 transition">
+        <i data-lucide="map-pin" class="w-4 h-4"></i>
+    </div>
+    <div class="text-left">
+        <div class="text-xs font-bold text-white flex items-center gap-1.5 group-hover:text-emerald-400 transition">
+            Sucursal Matriz
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        </div>
+        <p class="text-[10.5px] text-slate-400 leading-none mt-0.5">Texcoco / Chapingo · <span class="text-teal-400 font-medium">Ver mapa</span></p>
+    </div>
 </div>
-<div class="flex gap-6 z-10">
+
+<div class="z-10 text-center mb-10 fin flex flex-col items-center">
+    <img src="img/logo.png" alt="Procaña Motors" class="h-16 sm:h-20 w-auto object-contain mx-auto mb-3 drop-shadow-[0_8px_24px_rgba(14,165,233,0.25)]">
+    <h1 class="text-3xl font-bold text-white mb-2">Procaña Motors</h1>
+    <p class="text-slate-400 text-sm">Plataforma de Inteligencia Financiera & Control Operativo</p>
+</div>
+
+<!-- 2 Tarjetas Principales del Menú -->
+<div class="flex flex-wrap gap-6 z-10 justify-center items-center max-w-4xl">
+    <!-- Tarjeta 1: Asesoría Financiera -->
     <div id="menu-card-advisor" class="menu-card w-72 fin transition-all" onclick="goTo('advisor')" style="animation-delay:.1s">
         <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-sky-600/25"><i data-lucide="message-square-text" class="text-white w-7 h-7"></i></div>
         <h2 class="text-lg font-bold text-white mb-2">Asesoría Financiera</h2>
         <p id="menu-adv-desc" class="text-slate-400 text-xs leading-relaxed">Valuación de negocio, análisis de crédito, simulación de escenarios y explicaciones con IA.</p><div id="menu-adv-role-badge" class="mt-2.5"></div>
         <div id="menu-pos-indicator" class="hidden mt-3 text-[10px] text-emerald-400 font-semibold flex items-center justify-center gap-1"><i data-lucide="link-2" class="w-3 h-3"></i>Datos POS disponibles para sincronizar</div>
     </div>
+
+    <!-- Tarjeta 2: Punto de Venta -->
     <div id="menu-card-pos" class="menu-card w-72 fin transition-all" onclick="goTo('pos')" style="animation-delay:.2s">
         <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-600/25"><i data-lucide="shopping-cart" class="text-white w-7 h-7"></i></div>
         <h2 class="text-lg font-bold text-white mb-2">Punto de Venta</h2>
@@ -485,7 +569,7 @@
     <span id="s4" class="flex items-center gap-1 text-slate-600"><span class="w-4 h-4 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center text-[8px]">4</span>Escenarios</span>
 </div>
 <div id="chat" class="flex-1 px-5 pb-48 pt-4 overflow-y-auto space-y-5 scroll-smooth">
-    <div class="flex flex-col items-start max-w-[92%] fin"><span class="text-[9px] text-slate-500 mb-1 ml-1 font-semibold flex items-center gap-1"><i data-lucide="shield-check" class="w-3 h-3 text-sky-500"></i>CFO Copilot</span><div class="bot-bubble border-l-2 border-l-sky-500">Bienvenido. <b>No asumo ni invento datos.</b><br><br><span class="text-sky-400 font-medium">¿Cuánto vendes al mes y cuáles son tus costos operativos?</span></div></div>
+    <div class="flex flex-col items-start max-w-[92%] fin"><span class="text-[9px] text-slate-500 mb-1 ml-1 font-semibold flex items-center gap-1"><i data-lucide="shield-check" class="w-3 h-3 text-sky-500"></i>Procaña Motors</span><div class="bot-bubble border-l-2 border-l-sky-500">Bienvenido a Procaña Motors. <b>No asumo ni invento datos.</b><br><br><span class="text-sky-400 font-medium">¿Cuánto vendes al mes y cuáles son tus costos operativos?</span></div></div>
     <div id="pos-sync-banner" class="hidden fin"></div>
 </div>
 <div id="typ" class="hidden absolute bottom-44 left-5 bg-slate-800/90 backdrop-blur px-5 py-2.5 rounded-full border border-slate-700 shadow-2xl z-30"><div class="typing"><span></span><span></span><span></span></div></div>
@@ -595,10 +679,6 @@
 
 <!-- POS: Panel Izquierdo - Catálogo -->
 <div class="w-[38%] flex flex-col border-r border-slate-800/80 bg-slate-900 relative" style="min-width:340px">
-<div class="px-5 py-2.5 border-b border-slate-800/60 flex items-center justify-end gap-2 bg-slate-900/95 backdrop-blur-xl">
-    <button id="btn-pos-goto-advisor" onclick="goTo('advisor')" class="pos-btn bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-[11px] font-semibold shadow-lg shadow-sky-600/20 px-3 py-1.5"><i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>Asesor Financiero</button>
-    <button onclick="exportPosDB()" class="text-[10px] text-slate-500 hover:text-emerald-400 flex items-center gap-1 transition bg-slate-800/50 px-2.5 py-1.5 rounded-lg border border-slate-700/50"><i data-lucide="download" class="w-3 h-3"></i>Exportar</button>
-</div>
 
 <!-- POS Tabs -->
 <div class="flex border-b border-slate-800/40 px-4 pt-2 gap-1 overflow-x-auto hide-sb">

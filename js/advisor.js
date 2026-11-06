@@ -99,7 +99,7 @@ async function askOllama(userText, R, S) {
     const scopedS = buildScopedFinancialContext(S);
     const scopedR = buildScopedFinancialContext(R);
 
-    let prompt = `Eres CFO Copilot, un asesor financiero experto.
+    let prompt = `Eres el asesor financiero inteligente de Procaña Motors, un negocio de refacciones y servicios automotrices en México.
 Se te proporciona la información financiera calculada estrictamente por el sistema (NO inventes números, usa SOLO estos, si algún dato es null significa que falta).
 DATOS DEL USUARIO (CONTEXTO FILTRADO POR ROL ${currentUser ? currentUser.role : 'cajero'}): ${JSON.stringify(scopedS)}
 CÁLCULOS DEL SISTEMA: ${JSON.stringify(scopedR)}

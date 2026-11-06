@@ -46,6 +46,9 @@ function goTo(v){
     const btnBack = document.getElementById('btn-header-back-menu');
     if(btnBack) btnBack.classList.toggle('hidden', v === 'menu');
 
+    const headerPosActions = document.getElementById('header-pos-actions');
+    if(headerPosActions) headerPosActions.classList.toggle('hidden', v !== 'pos');
+
     if(v === 'menu'){
         updateMenuIndicators();
     }
@@ -293,6 +296,113 @@ async function syncFromPos(){
 }
 
 
+
+// ===== MODAL DE UBICACIÓN Y MAPA DE SUCURSAL MATRIZ (LEAFLET + OSM) =====
+let branchMapInstance = null;
+
+function openBranchModal(){
+    const modal = document.getElementById('branch-modal');
+    if(!modal) return;
+    modal.classList.remove('hidden');
+    renderBranchMap();
+    setTimeout(() => {
+        if(branchMapInstance){
+            branchMapInstance.invalidateSize();
+            branchMapInstance.setView([19.497626595933546, -98.890946969816], 16);
+        }
+    }, 160);
+    if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+function closeBranchModal(){
+    const modal = document.getElementById('branch-modal');
+    if(modal) modal.classList.add('hidden');
+}
+
+function copyBranchCoordinates(){
+    const text = "19.497626595933546, -98.890946969816";
+    const updateBtn = () => {
+        const btnTxt = document.getElementById('btn-copy-coords-txt');
+        if(btnTxt){
+            const old = btnTxt.textContent;
+            btnTxt.textContent = "¡Copiado!";
+            setTimeout(() => { btnTxt.textContent = old; }, 2000);
+        }
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(updateBtn).catch(() => {
+            fallbackCopy(text, updateBtn);
+        });
+    } else {
+        fallbackCopy(text, updateBtn);
+    }
+}
+
+function fallbackCopy(text, cb){
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); if(cb) cb(); } catch(e){}
+    document.body.removeChild(ta);
+}
+
+document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape'){
+        closeBranchModal();
+    }
+});
+
+function renderBranchMap(){
+    const mapEl = document.getElementById('branch-map');
+    if(!mapEl || typeof L === 'undefined') return;
+
+    const coords = [19.497626595933546, -98.890946969816];
+
+    if(!branchMapInstance){
+        branchMapInstance = L.map('branch-map', {
+            zoomControl: false,
+            attributionControl: true
+        }).setView(coords, 16);
+
+        // Capa OpenStreetMap limpia y 100% gratuita sin marcas de agua ni API key
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
+        }).addTo(branchMapInstance);
+
+        // Control de zoom en la esquina superior derecha
+        L.control.zoom({ position: 'topright' }).addTo(branchMapInstance);
+
+        // Pin de radar verde esmeralda neón
+        const pulsePin = L.divIcon({
+            className: 'custom-map-pin',
+            html: `
+                <div style="position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
+                    <div style="position:absolute;width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,0.35);animation:pulse-map 2s infinite ease-in-out;"></div>
+                    <div style="position:absolute;width:16px;height:16px;border-radius:50%;background:#10b981;border:2.5px solid #ffffff;box-shadow:0 0 14px #10b981;"></div>
+                </div>
+            `,
+            iconSize: [34, 34],
+            iconAnchor: [17, 17],
+            popupAnchor: [0, -18]
+        });
+
+        const marker = L.marker(coords, { icon: pulsePin }).addTo(branchMapInstance);
+        marker.bindPopup(`
+            <div style="font-family:'Inter',sans-serif;padding:3px 2px;min-width:190px;">
+                <div style="font-weight:700;font-size:12px;color:#38bdf8;margin-bottom:2px;display:flex;align-items:center;gap:4px;">
+                    <span>📍 Procaña Motors — Matriz & Almacén</span>
+                </div>
+                <div style="font-size:11px;color:#cbd5e1;line-height:1.4;">Texcoco / Chapingo, Edo. de México</div>
+                <div style="font-size:10px;color:#10b981;font-weight:600;margin-top:3px;">● 100 Refacciones en Inventario Activo</div>
+                <div style="font-size:9.5px;color:#94a3b8;font-family:monospace;margin-top:3px;">19.4976° N, 98.8909° W</div>
+            </div>
+        `).openPopup();
+    }
+}
 
 // ===== INICIALIZACIÓN GLOBAL DEL SISTEMA CON FIREBASE =====
 async function startApp() {

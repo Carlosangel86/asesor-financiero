@@ -228,9 +228,9 @@ function printSaleTicket(saleId){
     `).join('');
 
     const ticketHtml = `
-        <div class="tkt-center tkt-bold" style="font-size:13px">REFACCIONARIA Y SERVICIOS</div>
+        <div class="tkt-center tkt-bold" style="font-size:14px;letter-spacing:1px">PROCAÑA MOTORS</div>
         <div class="tkt-center">RFC: XAXX010101000</div>
-        <div class="tkt-center" style="font-size:10px">Sucursal Matriz · Monterrey, N.L.</div>
+        <div class="tkt-center" style="font-size:10px">Sucursal Matriz & Almacén Central · Texcoco, Edo. de México</div>
         <div class="tkt-divider"></div>
         <div class="tkt-flex"><span>Folio:</span><span class="tkt-bold">${sale.id}</span></div>
         <div class="tkt-flex"><span>Fecha:</span><span>${formatAppDate(sale.date)}</span></div>
