@@ -95,5 +95,62 @@ service cloud.firestore {
       // Escritura permitida para actualización de turnos y bitácora
       allow write: if true;
     }
+
+    // =========================================================================
+    // 5. Colección INVOICES (Facturas CFDI 4.0 Simuladas - Autofacturación y POS)
+    // =========================================================================
+    match /invoices/{invoiceId} {
+      // Lectura permitida para portal público de autofacturación (QR) y panel admin POS
+      allow read: if true;
+
+      // Creación: Validación de campos obligatorios, estatus activo e importe válido
+      allow create: if request.resource.data.keys().hasAll(['saleId', 'folio', 'receptor', 'total', 'status']) &&
+                    request.resource.data.status == 'active' &&
+                    request.resource.data.total is number &&
+                    request.resource.data.total >= 0;
+
+      // Actualización (cancelación simulada): Mantiene inmutables saleId y total
+      allow update: if request.resource.data.saleId == resource.data.saleId &&
+                    request.resource.data.total == resource.data.total;
+
+      // Las facturas nunca se eliminan físicamente de la base contable
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 6. Colección INVOICE_REQUESTS (Bitácora de Solicitudes de Autofacturación)
+    // =========================================================================
+    match /invoice_requests/{requestId} {
+      // Lectura para auditoría y seguimiento de solicitudes
+      allow read: if true;
+
+      // Creación desde portal de autofacturación con campos mínimos requeridos
+      allow create: if request.resource.data.keys().hasAll(['saleId', 'receptorRfc', 'status']);
+
+      // Inmutable una vez registrada la solicitud
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // 7. Colección BUSINESS (Datos Fiscales del Emisor y Configuración)
+    // =========================================================================
+    match /business/{docId} {
+      // Lectura pública para mostrar datos del emisor en portal y facturas
+      allow read: if true;
+
+      // Escritura para configuración de datos del emisor y folios
+      allow write: if true;
+    }
+
+    // =========================================================================
+    // 8. Colección TAX_CATALOGS (Catálogos SAT: Regímenes y Usos de CFDI)
+    // =========================================================================
+    match /tax_catalogs/{catalogId} {
+      // Lectura pública para formularios de autofacturación
+      allow read: if true;
+
+      // Escritura para inicialización de catálogos SAT
+      allow write: if true;
+    }
   }
 }

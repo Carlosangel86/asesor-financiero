@@ -29,7 +29,8 @@ import {
     orderBy, 
     limit, 
     serverTimestamp,
-    writeBatch
+    writeBatch,
+    runTransaction
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // --- 1. CONFIGURACIÓN EXACTA DE FIREBASE ---
@@ -396,6 +397,34 @@ export const SalesService = {
         }
     },
 
+    async getById(saleId) {
+        try {
+            if (!saleId) return null;
+            const docRef = doc(db, 'sales', saleId);
+            const snap = await getDoc(docRef);
+            return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        } catch (e) {
+            console.error('[Firestore Sales.getById Error]', e);
+            return null;
+        }
+    },
+
+    async getByToken(token) {
+        try {
+            if (!token) return null;
+            const q = query(collection(db, 'sales'), where('invoiceToken', '==', token), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                const d = snap.docs[0];
+                return { id: d.id, ...d.data() };
+            }
+            return null;
+        } catch (e) {
+            console.error('[Firestore Sales.getByToken Error]', e);
+            return null;
+        }
+    },
+
     async cancel(saleId, reason = '', cancelledBy = '') {
         try {
             const docRef = doc(db, 'sales', saleId);
@@ -575,6 +604,195 @@ export const StatsService = {
     }
 };
 
+// --- F. SERVICIO DE AUTOFACTURACIÓN SIMULADA (Colecciones 'invoices', 'invoice_requests', 'business', 'tax_catalogs') ---
+export const InvoicesFirestoreService = {
+    async getAll(limitCount = 300) {
+        try {
+            const q = query(collection(db, 'invoices'), orderBy('issuedAt', 'desc'), limit(limitCount));
+            const snap = await getDocs(q);
+            const list = [];
+            snap.forEach(docSnap => {
+                list.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            return list;
+        } catch (e) {
+            try {
+                const snap = await getDocs(collection(db, 'invoices'));
+                const list = [];
+                snap.forEach(docSnap => {
+                    list.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                list.sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0));
+                return list;
+            } catch (fallbackErr) {
+                console.error('[Firestore Invoices.getAll Error]', fallbackErr);
+                return [];
+            }
+        }
+    },
+
+    async getById(invoiceId) {
+        try {
+            if (!invoiceId) return null;
+            const snap = await getDoc(doc(db, 'invoices', invoiceId));
+            return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        } catch (e) {
+            console.error('[Firestore Invoices.getById Error]', e);
+            return null;
+        }
+    },
+
+    async getBySaleId(saleId) {
+        try {
+            if (!saleId) return null;
+            const q = query(collection(db, 'invoices'), where('saleId', '==', saleId));
+            const snap = await getDocs(q);
+            const list = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+            const active = list.find(inv => inv.status !== 'cancelled');
+            return active || list[0] || null;
+        } catch (e) {
+            console.error('[Firestore Invoices.getBySaleId Error]', e);
+            return null;
+        }
+    },
+
+    /**
+     * Emite una factura de forma atómica usando runTransaction para impedir duplicados sobre la misma venta.
+     */
+    async createInvoiceAtomic(saleId, invoiceData, requestLogData = null) {
+        const invId = invoiceData.id || ('inv_' + Date.now());
+        const saleRef = doc(db, 'sales', saleId);
+        const invRef = doc(db, 'invoices', invId);
+
+        await runTransaction(db, async (transaction) => {
+            const saleSnap = await transaction.get(saleRef);
+            if (saleSnap.exists()) {
+                const sData = saleSnap.data();
+                if (sData.status === 'cancelled') {
+                    throw new Error('SALE_CANCELLED: Esta venta fue cancelada y no puede ser facturada.');
+                }
+                if (sData.billingStatus === 'invoiced' && sData.invoiceId && sData.invoiceId !== invId) {
+                    throw new Error(`ALREADY_INVOICED:${sData.invoiceId}`);
+                }
+            }
+
+            transaction.set(invRef, {
+                ...invoiceData,
+                id: invId,
+                createdAt: serverTimestamp()
+            });
+
+            if (saleSnap.exists()) {
+                transaction.update(saleRef, {
+                    billingStatus: 'invoiced',
+                    invoiceId: invId,
+                    invoicedAt: invoiceData.issuedAt || new Date().toISOString(),
+                    receptorRfc: (invoiceData.receptor && invoiceData.receptor.rfc) || '',
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            if (requestLogData) {
+                const reqId = requestLogData.id || ('ireq_' + Date.now());
+                const reqRef = doc(db, 'invoice_requests', reqId);
+                transaction.set(reqRef, {
+                    ...requestLogData,
+                    id: reqId,
+                    invoiceId: invId,
+                    createdAt: serverTimestamp()
+                });
+            }
+        });
+
+        return invId;
+    },
+
+    async cancelInvoiceAtomic(invoiceId, saleId, reason = '', cancelledBy = 'admin') {
+        const invRef = doc(db, 'invoices', invoiceId);
+        const cancelledAtIso = new Date().toISOString();
+
+        await runTransaction(db, async (transaction) => {
+            const invSnap = await transaction.get(invRef);
+            let targetSaleId = saleId;
+            if (invSnap.exists()) {
+                targetSaleId = targetSaleId || invSnap.data().saleId;
+            }
+            const saleRef = targetSaleId ? doc(db, 'sales', targetSaleId) : null;
+            const saleSnap = saleRef ? await transaction.get(saleRef) : null;
+
+            if (invSnap.exists()) {
+                transaction.update(invRef, {
+                    status: 'cancelled',
+                    cancelReason: reason,
+                    cancelledBy: cancelledBy,
+                    cancelledAt: cancelledAtIso,
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            if (saleSnap && saleSnap.exists()) {
+                transaction.update(saleRef, {
+                    billingStatus: 'invoice_cancelled',
+                    invoiceId: null,
+                    updatedAt: serverTimestamp()
+                });
+            }
+        });
+
+        return true;
+    },
+
+    async getBusinessConfig() {
+        try {
+            const snap = await getDoc(doc(db, 'business', 'emisor'));
+            return snap.exists() ? snap.data() : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    async saveBusinessConfig(configData) {
+        try {
+            await setDoc(doc(db, 'business', 'emisor'), {
+                ...configData,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            return true;
+        } catch (e) {
+            console.warn('[Firestore Business.save Error]', e);
+            return false;
+        }
+    },
+
+    async seedTaxCatalogsIfEmpty(catalogPayload) {
+        try {
+            const ref = doc(db, 'tax_catalogs', 'sat_cfdi_4_0');
+            const snap = await getDoc(ref);
+            if (!snap.exists() && catalogPayload) {
+                await setDoc(ref, {
+                    ...catalogPayload,
+                    seededAt: serverTimestamp()
+                });
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    subscribe(callback) {
+        return onSnapshot(collection(db, 'invoices'), (snapshot) => {
+            const list = [];
+            snapshot.forEach(docSnap => {
+                list.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            list.sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0));
+            callback(list);
+        });
+    }
+};
+
 // =====================================================================
 // EXPOSICIÓN GLOBAL PARA INTEGRACIÓN CON EL CÓDIGO EXISTENTE
 // =====================================================================
@@ -588,6 +806,7 @@ window.FirebaseService = {
     products: ProductsService,
     sales: SalesService,
     stats: StatsService,
+    invoices: InvoicesFirestoreService,
     isInitialized: true
 };
 

@@ -13,6 +13,10 @@
     ],
     "rewrites": [
       {
+        "source": "/facturacion",
+        "destination": "/facturacion.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

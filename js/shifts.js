@@ -472,13 +472,67 @@ function printShiftCutZTicket(shiftId){
     }
 }
 
+// ===== APERTURA RÁPIDA DEL PORTAL DE AUTOFACTURACIÓN =====
+function openSelfBillingPortalForSale(saleId){
+    const sale = salesLog.find(s => s.id === saleId);
+    if(!sale){
+        alert("Venta no encontrada.");
+        return;
+    }
+    if(sale.status === 'cancelled'){
+        alert("Esta venta fue cancelada y no puede ser facturada.");
+        return;
+    }
+    if(!sale.invoiceToken && window.QRService){
+        sale.invoiceToken = window.QRService.ensureSaleToken ? window.QRService.ensureSaleToken(sale) : window.QRService.generateInvoiceToken();
+        sale.billingStatus = sale.billingStatus || 'pending';
+        localStorage.setItem('pos_sales', JSON.stringify(salesLog.slice(0, 100)));
+        if(window.InvoiceService && typeof window.InvoiceService.registerLocalTicketForBilling === 'function'){
+            window.InvoiceService.registerLocalTicketForBilling(sale);
+        }
+        if(window.FirebaseService && window.FirebaseService.sales){
+            window.FirebaseService.sales.create(sale).catch(console.warn);
+        }
+    }
+    const url = (window.QRService && window.QRService.getBillingPortalUrl)
+        ? window.QRService.getBillingPortalUrl(sale.invoiceToken, sale.id)
+        : `facturacion.html?token=${encodeURIComponent(sale.invoiceToken || '')}&folio=${encodeURIComponent(sale.id)}`;
+    window.open(url, '_blank');
+}
 
-
-
-// ===== IMPRESIÓN DE TICKET TÉRMICO (ESC/POS 58mm/80mm) =====
-function printSaleTicket(saleId){
+// ===== IMPRESIÓN DE TICKET TÉRMICO (ESC/POS 58mm/80mm) CON QR DE AUTOFACTURACIÓN =====
+async function printSaleTicket(saleId){
     const sale = salesLog.find(s => s.id === saleId);
     if(!sale) { alert("Ticket no encontrado"); return; }
+
+    // Asegurar que la venta tenga su token de autofacturación
+    if(!sale.invoiceToken){
+        sale.invoiceToken = (window.QRService && window.QRService.ensureSaleToken)
+            ? window.QRService.ensureSaleToken(sale)
+            : ('TK-' + sale.id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(-8));
+        sale.billingStatus = sale.billingStatus || 'pending';
+        localStorage.setItem('pos_sales', JSON.stringify(salesLog.slice(0, 100)));
+        if(window.FirebaseService && window.FirebaseService.sales){
+            window.FirebaseService.sales.create(sale).catch(console.warn);
+        }
+    }
+
+    if(window.InvoiceService && typeof window.InvoiceService.registerLocalTicketForBilling === 'function'){
+        window.InvoiceService.registerLocalTicketForBilling(sale);
+    }
+
+    const portalUrl = (window.QRService && window.QRService.getBillingPortalUrl)
+        ? window.QRService.getBillingPortalUrl(sale.invoiceToken, sale.id)
+        : `facturacion.html?token=${encodeURIComponent(sale.invoiceToken)}&folio=${encodeURIComponent(sale.id)}`;
+
+    let qrDataUrl = '';
+    if(window.QRService && window.QRService.generateQrDataUrl){
+        try {
+            qrDataUrl = await window.QRService.generateQrDataUrl(portalUrl, 130);
+        } catch(e){
+            console.warn('[Ticket QR Error]', e);
+        }
+    }
 
     const taxRate = sale.taxRate !== undefined ? sale.taxRate : currentTaxZoneRate;
     const subtotal = sale.subtotal !== undefined ? sale.subtotal : (sale.total / (1 + taxRate));
@@ -507,9 +561,15 @@ function printSaleTicket(saleId){
         </tr>
     `).join('');
 
+    const qrBlockHtml = qrDataUrl ? `
+        <div class="tkt-center" style="margin:6px 0 4px 0;">
+            <img src="${qrDataUrl}" alt="QR Autofacturación" style="width:115px;height:115px;margin:0 auto;display:block;image-rendering:pixelated;" />
+        </div>
+    ` : '';
+
     const ticketHtml = `
         <div class="tkt-center tkt-bold" style="font-size:14px;letter-spacing:1px">PROCAÑA MOTORS</div>
-        <div class="tkt-center">RFC: XAXX010101000</div>
+        <div class="tkt-center">RFC: PMO240115AA1</div>
         <div class="tkt-center" style="font-size:10px">Sucursal Matriz & Almacén Central · Texcoco, Edo. de México</div>
         <div class="tkt-divider"></div>
         <div class="tkt-flex"><span>Folio:</span><span class="tkt-bold">${sale.id}</span></div>
@@ -536,16 +596,21 @@ function printSaleTicket(saleId){
         <div class="tkt-divider"></div>
         ${payDetail}
         <div class="tkt-double-divider"></div>
-        <div class="tkt-center" style="font-size:9.5px">COMPROBANTE SIMPLIFICADO DE VENTA</div>
-        <div class="tkt-center" style="font-size:9px">Para solicitar factura electrónica acuda a sucursal</div>
+        <div class="tkt-center tkt-bold" style="font-size:10px;margin-top:2px">AUTOFACTURACIÓN ELECTRÓNICA (SIMULACIÓN)</div>
+        <div class="tkt-center" style="font-size:8.5px">Escanea el código QR o ingresa tu Token en el portal:</div>
+        ${qrBlockHtml}
+        <div class="tkt-center tkt-bold" style="font-size:10px;letter-spacing:0.5px;">TOKEN: ${sale.invoiceToken}</div>
+        <div class="tkt-center" style="font-size:8.5px;">FOLIO VENTA: ${sale.id}</div>
+        <div class="tkt-center" style="font-size:8px;margin-top:2px;">DOCUMENTO DE SIMULACIÓN - SIN VALIDEZ FISCAL</div>
+        <div class="tkt-divider"></div>
         <div class="tkt-center tkt-bold" style="margin-top:4px">¡GRACIAS POR SU PREFERENCIA!</div>
     `;
 
     const printArea = document.getElementById('thermal-print-area');
     if(printArea){
         printArea.innerHTML = ticketHtml;
-        window.print();
+        setTimeout(() => {
+            window.print();
+        }, 80);
     }
 }
-
-

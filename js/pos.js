@@ -2483,6 +2483,10 @@ function closeSale(){
     const subtotalCalc = total / (1 + currentTaxZoneRate);
     const taxAmountCalc = total - subtotalCalc;
 
+    const generatedToken = (window.QRService && typeof window.QRService.generateInvoiceToken === 'function')
+        ? window.QRService.generateInvoiceToken()
+        : ('TK-' + Date.now().toString(36).toUpperCase());
+
     const sale={
         id:'s_'+Date.now(),
         date:new Date().toISOString(),
@@ -2497,12 +2501,20 @@ function closeSale(){
         status: 'completed',
         cashierId: currentUser ? currentUser.id : 'usr_caja',
         cashierUsername: currentUser ? currentUser.username : 'caja_demo',
-        cashierName: currentUser ? currentUser.name : 'Cajero'
+        cashierName: currentUser ? currentUser.name : 'Cajero',
+        invoiceToken: generatedToken,
+        billingStatus: 'pending',
+        invoiceId: null,
+        invoiceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
 
     logActivity('Venta Registrada', `Venta cobrada por ${fmt(total)} (${paymentData.label}) por @${sale.cashierUsername}`, 'success');
 
     salesLog.unshift(sale);
+    try { localStorage.setItem('pos_sales', JSON.stringify(salesLog.slice(0, 100))); } catch(e) {}
+    if (window.InvoiceService && typeof window.InvoiceService.registerLocalTicketForBilling === 'function') {
+        window.InvoiceService.registerLocalTicketForBilling(sale);
+    }
     if (window.FirebaseService && window.FirebaseService.sales) {
         window.FirebaseService.sales.create(sale).catch(console.warn);
     }
@@ -2847,8 +2859,14 @@ function upPosSummary(){
             if(isClosedShift){
                 statusBadge += ` <span class="pill bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-bold" title="Turno Cerrado (Corte Z realizado)"><i data-lucide="lock" class="w-2.5 h-2.5 text-amber-400"></i>Corte Z</span>`;
             }
+            if(!isCancelled && s.billingStatus === 'invoiced'){
+                statusBadge += ` <span class="pill bg-indigo-500/20 text-indigo-300 border border-indigo-500/35 text-[9px] font-bold" title="Comprobante de autofacturación emitido"><i data-lucide="file-check-2" class="w-2.5 h-2.5 text-indigo-400"></i>Facturada</span>`;
+            }
 
-            const printBtn = `<button onclick="printSaleTicket('${s.id}')" class="text-slate-500 hover:text-sky-300 transition p-1 shrink-0" title="Imprimir Ticket Térmico"><i data-lucide="printer" class="w-4 h-4"></i></button>`;
+            const invoicePortalBtn = !isCancelled
+                ? `<button onclick="openSelfBillingPortalForSale('${s.id}')" class="text-slate-500 hover:text-indigo-300 transition p-1 shrink-0" title="Abrir Portal de Autofacturación (CFDI Simulado)"><i data-lucide="qr-code" class="w-4 h-4"></i></button>`
+                : '';
+            const printBtn = `${invoicePortalBtn}<button onclick="printSaleTicket('${s.id}')" class="text-slate-500 hover:text-sky-300 transition p-1 shrink-0" title="Imprimir Ticket Térmico con QR"><i data-lucide="printer" class="w-4 h-4"></i></button>`;
 
             if(!isCancelled){
                 if(isClosedShift){

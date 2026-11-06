@@ -70,7 +70,7 @@ function showPosViewMode(mode){
     }
 
     posViewMode = mode;
-    ['today', 'stats', 'almacen', 'shifts'].forEach(m => {
+    ['today', 'stats', 'almacen', 'shifts', 'invoices'].forEach(m => {
         const el = document.getElementById('pos-panel-' + m);
         const btn = document.getElementById('btn-pos-' + m);
         const isActive = m === mode;
@@ -93,6 +93,7 @@ function showPosViewMode(mode){
     }
     if(mode === 'almacen') renderAlmacenDashboard();
     if(mode === 'shifts' && typeof renderShiftsHistoryView === 'function') renderShiftsHistoryView();
+    if(mode === 'invoices' && typeof renderAdminInvoicesView === 'function') renderAdminInvoicesView();
     lucide.createIcons();
 }
 
