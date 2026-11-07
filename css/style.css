@@ -1022,3 +1022,16 @@ input:checked + .slider:before{transform:translateX(14px)}
 
 
 
+
+/* Soporte Móvil Blackmorphism & Safe Areas */
+#chat-input-container {
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+}
+
+@media (max-width: 1023px) {
+    #v-dash, #v-ratios, #v-back, #v-amor,
+    #pv-catalog, #pv-sell, #pv-expense, #pv-users, #pv-analista-info,
+    #pos-panel-today, #pos-panel-stats, #pos-panel-almacen, #pos-panel-shifts, #pos-panel-invoices {
+        padding-bottom: max(5.5rem, calc(env(safe-area-inset-bottom, 0px) + 5rem)) !important;
+    }
+}

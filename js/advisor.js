@@ -46,7 +46,7 @@ let donut,bars;
 function initCharts(){
     const elDonut = document.getElementById('cDonut');
     if(elDonut && !donut) {
-        donut=new Chart(elDonut,{type:'doughnut',data:{labels:['Costos','Ganancia'],datasets:[{data:[1,0],backgroundColor:['#1e293b','#0f172a'],borderWidth:0,borderRadius:5}]},options:{cutout:'74%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:false}});
+        donut=new Chart(elDonut,{type:'doughnut',data:{labels:['Costos','Ganancia'],datasets:[{data:[1,0],backgroundColor:['#1e293b','#0f172a'],borderWidth:0,borderRadius:5}]},options:{cutout:'74%',layout:{padding:{top:8,bottom:8}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:false}});
     }
     const elBars = document.getElementById('cBars');
     if(elBars && !bars) {

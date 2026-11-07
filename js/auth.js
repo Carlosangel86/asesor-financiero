@@ -527,9 +527,12 @@ function applyRoleUI(){
     if(uName) uName.textContent = currentUser.name || currentUser.username;
     
     if(rPill){
-        const roleLabels = { admin: 'Administrador General', supervisor: 'Supervisor Operativo', cajero: 'Cajero Punto de Venta', analista: 'Analista Financiero', almacen: 'Encargado de Almacén' };
-        rPill.textContent = roleLabels[currentUser.role] || (currentUser.role ? currentUser.role.toUpperCase() : 'USUARIO');
-        rPill.className = `pill badge-role-${currentUser.role} font-bold text-[9px] uppercase`;
+        const roleLabelsLong = { admin: 'Administrador General', supervisor: 'Supervisor Operativo', cajero: 'Cajero Punto de Venta', analista: 'Analista Financiero', almacen: 'Encargado de Almacén' };
+        const roleLabelsShort = { admin: 'Admin', supervisor: 'Supervisor', cajero: 'Cajero', analista: 'Analista', almacen: 'Almacén' };
+        const longTxt = roleLabelsLong[currentUser.role] || (currentUser.role ? currentUser.role.toUpperCase() : 'USUARIO');
+        const shortTxt = roleLabelsShort[currentUser.role] || longTxt;
+        rPill.innerHTML = `<span class="hidden sm:inline">${longTxt}</span><span class="sm:hidden">${shortTxt}</span>`;
+        rPill.className = `pill badge-role-${currentUser.role} font-bold text-[9px] uppercase tracking-wider shrink-0`;
     }
 
     const role = currentUser.role;
