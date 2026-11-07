@@ -36,7 +36,7 @@ function buildScopedFinancialContext(rawContext){
 }
 
 // ===== ADVISOR MODULE =====
-let busy=false,stepN=0,advisorRestoredOnce=false;
+let busy=false,stepN=0,advisorRestoredOnce=false,initialNarrativeSent=false;
 const S={
     rev:null,
     cost:null,
@@ -163,9 +163,14 @@ async function sendAdv(){
         try { if(typeof upPosSummary === 'function') upPosSummary(); } catch(pe){}
 
         alog('Narrating');
-        await slp(500);
-        if(typ)typ.classList.add('hidden');
-        addMsg(narrate(R),'b');
+        await slp(300);
+
+        // Enviar desglose cuantitativo (narrate) ÚNICAMENTE en la primera consulta del asesor
+        if(!initialNarrativeSent){
+            initialNarrativeSent = true;
+            if(typ) typ.classList.add('hidden');
+            addMsg(narrate(R), 'b');
+        }
         try { advStep(); } catch(ae){ console.warn('[advStep warn]', ae); }
         try { saveAdv(R, txt); } catch(se){ console.warn('[saveAdv warn]', se); }
 
@@ -496,7 +501,10 @@ function applyTaxRegime(regime){
     upDash(R);
     upRatios(R);
     saveAdv(R, `Selección régimen fiscal: ${label}`);
-    addMsg(narrate(R), 'b');
+    if(!initialNarrativeSent){
+        initialNarrativeSent = true;
+        addMsg(narrate(R), 'b');
+    }
 }
 
 function applyTargetMarginPreset(pctNum){
@@ -512,7 +520,10 @@ function applyTargetMarginPreset(pctNum){
     upRatios(R);
     if(typeof upPosSummary === 'function') upPosSummary();
     saveAdv(R, `Meta de margen del ${pctNum}%`);
-    addMsg(narrate(R), 'b');
+    if(!initialNarrativeSent){
+        initialNarrativeSent = true;
+        addMsg(narrate(R), 'b');
+    }
     askOllama(`Quiero alcanzar un margen del ${pctNum}% y llegar a mis ventas meta. ¿Qué estrategias me recomiendas?`, R, S);
 }
 
@@ -1383,6 +1394,9 @@ async function restoreAdvisorState(forceRenderChat = false){
         const hasAnyData = Object.values(inp).some(v => v !== null && v !== undefined);
         if(!hasAnyData) return false;
 
+        // Si ya existen datos previos guardados o restaurados, marcar narrativa inicial como completada
+        initialNarrativeSent = true;
+
         // Restaurar todas las propiedades en S
         Object.keys(S).forEach(k => {
             if(inp[k] !== undefined && inp[k] !== null){
@@ -1549,12 +1563,22 @@ function handleAdvisorEditSubmit(event) {
     if (S.target_sales !== null) changesList.push(`Ventas Meta: <b>${fmt(S.target_sales)}/mes</b>`);
     if (S.tax) changesList.push(`Régimen: <b>${S.tax}</b>`);
 
-    addMsg(`<div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-xs text-sky-200 mb-2">
-        <div class="font-bold text-sky-400 flex items-center gap-1.5 mb-1">
-            <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>Parámetros Actualizados Manualmente
-        </div>
-        <div class="text-slate-300 leading-relaxed">${changesList.join(' · ')}</div>
-    </div>` + narrate(R), 'b');
+    if(!initialNarrativeSent){
+        initialNarrativeSent = true;
+        addMsg(`<div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-xs text-sky-200 mb-2">
+            <div class="font-bold text-sky-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>Parámetros Actualizados Manualmente
+            </div>
+            <div class="text-slate-300 leading-relaxed">${changesList.join(' · ')}</div>
+        </div>` + narrate(R), 'b');
+    } else {
+        addMsg(`<div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-xs text-sky-200 mb-2">
+            <div class="font-bold text-sky-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>Parámetros Actualizados Manualmente
+            </div>
+            <div class="text-slate-300 leading-relaxed">${changesList.join(' · ')}</div>
+        </div>`, 'b');
+    }
 
     if (typeof showGlobalToast === 'function') {
         showGlobalToast('✓ Parámetros actualizados y recalculados con éxito.', 'success');
@@ -1720,15 +1744,15 @@ async function resetAdvisorCompletely() {
     upRatios(R);
 
     // Reiniciar gráficas a estado inicial en blanco
-    if (donut) {
+    if (donut && donut.data && donut.data.datasets && donut.data.datasets[0]) {
         donut.data.datasets[0].data = [1, 0];
         donut.update();
     }
-    if (bars) {
+    if (bars && bars.data && bars.data.datasets) {
         bars.data.datasets.forEach(ds => ds.data = [0, 0, 0]);
         bars.update();
     }
-    if (radarChart) {
+    if (radarChart && radarChart.data && radarChart.data.datasets && radarChart.data.datasets[0]) {
         radarChart.data.datasets[0].data = [0, 0, 0, 0, 0, 0];
         radarChart.update();
     }
@@ -1758,6 +1782,7 @@ async function resetAdvisorCompletely() {
     stepN = 0;
     advStep();
     advisorRestoredOnce = false;
+    initialNarrativeSent = false;
     updateInitialHints();
 
     // Actualizar barra de meta diaria en el POS si existe
