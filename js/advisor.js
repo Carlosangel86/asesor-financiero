@@ -158,6 +158,16 @@ async function sendAdv(){
 async function callOpenRouterAI(messages, model) {
     const config = window.AI_CONFIG || {};
     const apiKey = config.apiKey || localStorage.getItem('openrouter_api_key') || '';
+
+    // Preferente: Firebase AI Logic (Gemini) sin API Key expuesta en el cliente
+    if (window.AIService) {
+        try {
+            return await window.AIService.generate(messages);
+        } catch (aiErr) {
+            console.warn('[Firebase AI Logic Error]', aiErr);
+            if (!apiKey) throw aiErr;
+        }
+    }
     if (!apiKey) return null;
 
     const targetModel = model || config.model || 'google/gemini-3.8-flash';
@@ -213,7 +223,7 @@ Instrucciones:
 
     // 1. Intentar con OpenRouter si la API Key está configurada
     const config = window.AI_CONFIG || {};
-    const hasOpenRouter = (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
+    const hasOpenRouter = window.AIService || (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
     if (hasOpenRouter) {
         try {
             const aiRes = await callOpenRouterAI([
@@ -223,7 +233,7 @@ Instrucciones:
 
             if (aiRes) {
                 document.getElementById('typ').classList.add('hidden');
-                addMsg(`<div class="mt-2 pt-3 border-t border-sky-500/20 text-[13px] text-sky-100/90 leading-relaxed"><div class="flex items-center gap-1.5 mb-2 text-sky-400 font-bold uppercase tracking-wider text-[10px]"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Análisis Inteligente (OpenRouter · ${aiRes.model})</div>${aiRes.text}</div>`, 'b');
+                addMsg(`<div class="mt-2 pt-3 border-t border-sky-500/20 text-[13px] text-sky-100/90 leading-relaxed"><div class="flex items-center gap-1.5 mb-2 text-sky-400 font-bold uppercase tracking-wider text-[10px]"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Análisis Inteligente (${aiRes.model})</div>${aiRes.text}</div>`, 'b');
                 lucide.createIcons();
                 return;
             }
@@ -248,7 +258,7 @@ Instrucciones:
         lucide.createIcons();
     } catch (e) {
         document.getElementById('typ').classList.add('hidden');
-        addMsg('<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. Asegúrate de configurar tu API Key de OpenRouter en js/api-config.js o encender Ollama local.</div>', 'b');
+        addMsg('<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. No se pudo obtener respuesta de la IA (Firebase AI Logic). Revisa tu conexión o que el servicio esté habilitado en Firebase.</div>', 'b');
         lucide.createIcons();
     }
 }
@@ -294,7 +304,7 @@ INSTRUCCIONES CLAVE:
 
     // 1. Intentar con OpenRouter si la API Key está configurada
     const config = window.AI_CONFIG || {};
-    const hasOpenRouter = (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
+    const hasOpenRouter = window.AIService || (config.apiKey && config.apiKey.trim() !== '') || localStorage.getItem('openrouter_api_key');
     if (hasOpenRouter) {
         try {
             const aiRes = await callOpenRouterAI([
@@ -309,7 +319,7 @@ INSTRUCCIONES CLAVE:
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-1.5 text-indigo-400 font-bold uppercase tracking-wider text-[10px]">
                             <span class="w-5 h-5 rounded bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-[9px] border border-indigo-500/40">SAT</span>
-                            <i data-lucide="scale" class="w-3.5 h-3.5"></i> Asesor Fiscal · OpenRouter (${aiRes.model})
+                            <i data-lucide="scale" class="w-3.5 h-3.5"></i> Asesor Fiscal · ${aiRes.model}
                         </div>
                     </div>
                     <div class="space-y-2 mb-3">
@@ -367,7 +377,7 @@ INSTRUCCIONES CLAVE:
         lucide.createIcons();
     } catch (e) {
         document.getElementById('typ').classList.add('hidden');
-        addMsg(`<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. Asegúrate de configurar tu API Key de OpenRouter en js/api-config.js o encender Ollama local.</div>`, 'b');
+        addMsg(`<div class="mt-2 text-rose-400 text-[11px]"><i data-lucide="wifi-off" class="w-3 h-3 inline"></i> No se pudo conectar a la IA. No se pudo obtener respuesta de la IA (Firebase AI Logic). Revisa tu conexión o que el servicio esté habilitado en Firebase.</div>`, 'b');
         lucide.createIcons();
     }
 }
