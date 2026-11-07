@@ -2773,6 +2773,9 @@ function closeSale(){
     upPosStats();
     onSellProductChange();
     updateShiftUI();
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+    if(typeof checkPosData === 'function') checkPosData();
+    if(typeof updateInitialHints === 'function') updateInitialHints();
     
     // Auto-ofrecer impresión térmica
     setTimeout(() => {
@@ -2787,16 +2790,13 @@ let expenseFilter = 'today';
 function setExpenseFilter(filter){
     expenseFilter = filter;
     const btnToday = document.getElementById('btn-exp-filter-today');
+    const btnMonth = document.getElementById('btn-exp-filter-month');
     const btnAll = document.getElementById('btn-exp-filter-all');
-    if(btnToday && btnAll){
-        if(filter === 'today'){
-            btnToday.className = 'px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
-            btnAll.className = 'px-2 py-0.5 rounded font-semibold text-slate-400 hover:text-white';
-        } else {
-            btnAll.className = 'px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
-            btnToday.className = 'px-2 py-0.5 rounded font-semibold text-slate-400 hover:text-white';
-        }
-    }
+    const activeCls = 'px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+    const idleCls = 'px-2 py-0.5 rounded font-semibold text-slate-400 hover:text-white';
+    if(btnToday) btnToday.className = filter === 'today' ? activeCls : idleCls;
+    if(btnMonth) btnMonth.className = filter === 'month' ? activeCls : idleCls;
+    if(btnAll) btnAll.className = filter === 'all' ? activeCls : idleCls;
     renderExpenses();
 }
 
@@ -2831,23 +2831,52 @@ function addExpense(){
     renderExpenses();
     upPosSummary();
     upPosStats();
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+    if(typeof checkPosData === 'function') checkPosData();
 }
 
 function renderExpenses(){
     const listEl = document.getElementById('exp-list');
     if(!listEl) return;
     const today = new Date().toDateString();
+    const currentMonthKey = typeof selectedStatsMonth !== 'undefined' && selectedStatsMonth !== 'all'
+        ? selectedStatsMonth
+        : getYearMonthKey(new Date());
     const countEl = document.getElementById('exp-total-count');
     if(countEl) countEl.textContent = expenses.length;
 
-    const filtered = (expenseFilter === 'today')
-        ? expenses.filter(e => new Date(e.date).toDateString() === today)
-        : [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    // Actualizar resumen mensual por categoría (Fijos, Variables, Otros) en el panel de Gastos
+    const monthExpenses = expenses.filter(e => getYearMonthKey(e.date) === currentMonthKey);
+    const sumFijo = monthExpenses.filter(e => (e.category || 'fijo') === 'fijo').reduce((a, b) => a + (Number(b.amount) || 0), 0);
+    const sumVar = monthExpenses.filter(e => e.category === 'variable').reduce((a, b) => a + (Number(b.amount) || 0), 0);
+    const sumOtro = monthExpenses.filter(e => e.category === 'otro').reduce((a, b) => a + (Number(b.amount) || 0), 0);
+    const elSumFijo = document.getElementById('exp-sum-fijo');
+    const elSumVar = document.getElementById('exp-sum-variable');
+    const elSumOtro = document.getElementById('exp-sum-otro');
+    const elMonthLbl = document.getElementById('exp-summary-month-lbl');
+    if(elSumFijo) elSumFijo.textContent = fmt(sumFijo);
+    if(elSumVar) elSumVar.textContent = fmt(sumVar);
+    if(elSumOtro) elSumOtro.textContent = fmt(sumOtro);
+    if(elMonthLbl) elMonthLbl.textContent = formatMonthKeyLabel(currentMonthKey).replace(' (Mes Actual)', '');
+
+    let filtered = [];
+    if(expenseFilter === 'today'){
+        filtered = expenses.filter(e => new Date(e.date).toDateString() === today);
+    } else if(expenseFilter === 'month'){
+        filtered = [...monthExpenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    } else {
+        filtered = [...expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    }
 
     const canManageExpenses = hasPermission('inventory.adjust') || hasPermission('catalog.edit') || hasPermission('sales.approve_cancel') || (currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor'));
 
     if(filtered.length === 0){
-        listEl.innerHTML = `<div class="text-slate-600 text-sm text-center py-6">${expenseFilter === 'today' ? 'Sin gastos registrados hoy.' : 'No hay gastos registrados en el historial.'}</div>`;
+        const emptyMsg = expenseFilter === 'today'
+            ? 'Sin gastos registrados hoy.'
+            : expenseFilter === 'month'
+                ? 'Sin gastos registrados en este mes.'
+                : 'No hay gastos registrados en el historial.';
+        listEl.innerHTML = `<div class="text-slate-600 text-sm text-center py-6">${emptyMsg}</div>`;
         return;
     }
 
@@ -2953,6 +2982,8 @@ function saveEditExpense(){
     renderExpenses();
     upPosSummary();
     upPosStats();
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+    if(typeof checkPosData === 'function') checkPosData();
 }
 
 function deleteExpense(id){
@@ -2978,6 +3009,8 @@ function deleteExpense(id){
     renderExpenses();
     upPosSummary();
     upPosStats();
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+    if(typeof checkPosData === 'function') checkPosData();
 }
 
 function upPosSummary(){
@@ -3260,16 +3293,216 @@ function initHourlyChart(){
 }
 initHourlyChart();
 
+// ===== MOTOR DE AGRUPACIÓN Y FILTRADO MENSUAL (YYYY-MM) =====
+const POS_MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function getYearMonthKey(dateInput){
+    const d = dateInput ? new Date(dateInput) : new Date();
+    if(isNaN(d.getTime())){
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthKeyLabel(monthKey){
+    if(!monthKey || monthKey === 'all') return 'Acumulado Histórico (Todos)';
+    const parts = String(monthKey).split('-');
+    if(parts.length !== 2) return monthKey;
+    const y = parts[0];
+    const mIdx = parseInt(parts[1], 10) - 1;
+    const mName = POS_MONTH_NAMES[mIdx] || monthKey;
+    const currentKey = getYearMonthKey(new Date());
+    return monthKey === currentKey ? `${mName} ${y} (Mes Actual)` : `${mName} ${y}`;
+}
+
+let selectedStatsMonth = getYearMonthKey(new Date());
+
+function getAvailablePosMonths(){
+    const monthSet = new Set();
+    const currentKey = getYearMonthKey(new Date());
+    monthSet.add(currentKey);
+
+    const allSales = (typeof salesLog !== 'undefined' && Array.isArray(salesLog) && salesLog.length > 0)
+        ? salesLog
+        : JSON.parse(localStorage.getItem('pos_sales') || '[]');
+    const allExpenses = (typeof expenses !== 'undefined' && Array.isArray(expenses) && expenses.length > 0)
+        ? expenses
+        : JSON.parse(localStorage.getItem('pos_expenses') || '[]');
+
+    allSales.forEach(s => {
+        if(s && s.status !== 'cancelled' && s.date){
+            monthSet.add(getYearMonthKey(s.date));
+        }
+    });
+    allExpenses.forEach(e => {
+        if(e && e.date){
+            monthSet.add(getYearMonthKey(e.date));
+        }
+    });
+
+    const sortedKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+    const options = sortedKeys.map(k => ({ key: k, label: formatMonthKeyLabel(k) }));
+    options.push({ key: 'all', label: 'Acumulado Histórico (Todos)' });
+    return options;
+}
+
+function populatePosMonthSelectors(){
+    const options = getAvailablePosMonths();
+    if(!options.some(o => o.key === selectedStatsMonth)){
+        selectedStatsMonth = getYearMonthKey(new Date());
+    }
+    const html = options.map(o => `<option value="${o.key}" ${o.key === selectedStatsMonth ? 'selected' : ''}>${o.label}</option>`).join('');
+    ['pos-stats-month-select', 'adv-pos-month-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el){
+            el.innerHTML = html;
+            el.value = selectedStatsMonth;
+        }
+    });
+}
+
+function onChangePosStatsMonth(newMonthKey){
+    selectedStatsMonth = newMonthKey || getYearMonthKey(new Date());
+    populatePosMonthSelectors();
+    upPosStats();
+    renderExpenses();
+    updateAdvisorPosLiveBar();
+}
+if(typeof window !== 'undefined'){
+    window.onChangePosStatsMonth = onChangePosStatsMonth;
+    window.getYearMonthKey = getYearMonthKey;
+    window.formatMonthKeyLabel = formatMonthKeyLabel;
+}
+
+function updateAdvisorPosLiveBar(){
+    populatePosMonthSelectors();
+    const fin = getPosFinancials(selectedStatsMonth);
+    const liveRevEl = document.getElementById('adv-live-rev');
+    const liveFixedEl = document.getElementById('adv-live-fixed');
+    const liveVarEl = document.getElementById('adv-live-var');
+
+    const revVal = fin ? fin.totalRevenue : 0;
+    const fixedVal = fin ? fin.fixedExpenses : 0;
+    const varVal = fin ? fin.totalVariableCosts : 0;
+
+    if(liveRevEl) liveRevEl.textContent = fmt(revVal);
+    if(liveFixedEl) liveFixedEl.textContent = fmt(fixedVal);
+    if(liveVarEl) liveVarEl.textContent = fmt(varVal);
+
+    // Actualizar barra de Avance Real Mostrador vs Meta en la tarjeta de Ventas Meta del Asesor
+    const realMonthLbl = document.getElementById('dash-pos-month-lbl');
+    const realProgTxt = document.getElementById('dash-pos-real-progress-txt');
+    const realProgBar = document.getElementById('dash-pos-real-progress-bar');
+
+    if(realMonthLbl){
+        realMonthLbl.textContent = formatMonthKeyLabel(selectedStatsMonth).replace(' (Mes Actual)', '').replace('Acumulado Histórico (Todos)', 'Histórico');
+    }
+    if(realProgTxt && realProgBar){
+        let refTarget = null;
+        if(typeof window !== 'undefined' && window.S && window.S.target_sales && window.S.target_sales > 0){
+            refTarget = window.S.target_sales;
+        } else {
+            try {
+                const savedAdv = JSON.parse(localStorage.getItem('cfo_adv_active_state') || 'null');
+                if(savedAdv && savedAdv.S && savedAdv.S.target_sales > 0) refTarget = savedAdv.S.target_sales;
+            } catch(e){}
+        }
+        if(refTarget && refTarget > 0){
+            const pct = Math.min(Math.round((revVal / refTarget) * 100), 100);
+            const missing = Math.max(0, refTarget - revVal);
+            realProgBar.style.width = pct + '%';
+            realProgBar.className = 'h-full transition-all duration-500 rounded-full ' + (pct >= 100 ? 'bg-emerald-400' : pct >= 50 ? 'bg-teal-400' : 'bg-sky-400');
+            realProgTxt.textContent = `${fmt(revVal)} / ${fmt(refTarget)} (${pct}%) · ${missing > 0 ? 'Faltan ' + fmt(missing) : '¡Meta cumplida!'}`;
+        } else {
+            realProgBar.style.width = '0%';
+            realProgTxt.textContent = `${fmt(revVal)} vendidos (Define % margen meta en el Asesor)`;
+        }
+    }
+}
+if(typeof window !== 'undefined') window.updateAdvisorPosLiveBar = updateAdvisorPosLiveBar;
+
 function upPosStats(){
+    populatePosMonthSelectors();
     const emptyEl = document.getElementById('stats-empty');
     const contentEl = document.getElementById('stats-content');
-    
-    // Filtrar estrictamente solo ventas activas (excluir canceladas)
-    const activeSales = (salesLog || []).filter(s => s.status !== 'cancelled');
+    const monthlyFinEl = document.getElementById('stats-monthly-financials');
+
+    const allActiveSales = (salesLog || []).filter(s => s.status !== 'cancelled');
+    const allExpenses = expenses || [];
+
+    const activeSales = selectedStatsMonth === 'all'
+        ? allActiveSales
+        : allActiveSales.filter(s => getYearMonthKey(s.date) === selectedStatsMonth);
+
+    const periodExpenses = selectedStatsMonth === 'all'
+        ? allExpenses
+        : allExpenses.filter(e => getYearMonthKey(e.date) === selectedStatsMonth);
+
+    const fin = getPosFinancials(selectedStatsMonth);
+
+    // Actualizar tarjeta de Corte Financiero del Periodo si existen ventas o gastos
+    if(monthlyFinEl){
+        if((activeSales && activeSales.length > 0) || (periodExpenses && periodExpenses.length > 0)){
+            monthlyFinEl.classList.remove('hidden');
+            const titleEl = document.getElementById('stat-period-title');
+            const revEl = document.getElementById('stat-m-rev');
+            const revSubEl = document.getElementById('stat-m-rev-sub');
+            const fixedEl = document.getElementById('stat-m-fixed');
+            const varEl = document.getElementById('stat-m-variable');
+            const varSubEl = document.getElementById('stat-m-variable-sub');
+            const netEl = document.getElementById('stat-m-net');
+            const netSubEl = document.getElementById('stat-m-net-sub');
+            const goalTxtEl = document.getElementById('stat-m-goal-txt');
+            const goalBarEl = document.getElementById('stat-m-goal-bar');
+            const metaStatusEl = document.getElementById('stat-period-meta-status');
+
+            const revVal = fin ? fin.totalRevenue : 0;
+            const fixedVal = fin ? fin.fixedExpenses : 0;
+            const varTotal = fin ? fin.totalVariableCosts : 0;
+            const cogsVal = fin ? fin.totalCogs : 0;
+            const varExpVal = fin ? fin.variableExpenses : 0;
+            const netVal = fin ? fin.netProfit : 0;
+            const netMarginPct = revVal > 0 ? ((netVal / revVal) * 100).toFixed(1) : '0.0';
+
+            if(titleEl) titleEl.textContent = formatMonthKeyLabel(selectedStatsMonth);
+            if(revEl) revEl.textContent = fmt(revVal);
+            if(revSubEl) revSubEl.textContent = `${activeSales.length} ticket(s) en el periodo`;
+            if(fixedEl) fixedEl.textContent = fmt(fixedVal);
+            if(varEl) varEl.textContent = fmt(varTotal);
+            if(varSubEl) varSubEl.textContent = `COGS: ${fmt(cogsVal)} + Var: ${fmt(varExpVal)}`;
+            if(netEl){
+                netEl.textContent = (netVal < 0 ? '-' : '') + fmt(Math.abs(netVal));
+                netEl.className = 'text-base font-bold mono mt-1 ' + (netVal > 0 ? 'text-emerald-400' : netVal < 0 ? 'text-rose-400' : 'text-sky-400');
+            }
+            if(netSubEl) netSubEl.textContent = revVal > 0 ? `Margen real: ${netMarginPct}%` : 'Sin ventas en el periodo';
+
+            let refTarget = null;
+            if(typeof window !== 'undefined' && window.S && window.S.target_sales && window.S.target_sales > 0){
+                refTarget = window.S.target_sales;
+            }
+            if(refTarget && refTarget > 0){
+                const pct = Math.min(Math.round((revVal / refTarget) * 100), 100);
+                if(metaStatusEl) metaStatusEl.textContent = `Meta Asesor: ${fmt(refTarget)}/mes`;
+                if(goalTxtEl) goalTxtEl.textContent = `${fmt(revVal)} / ${fmt(refTarget)} (${pct}%)`;
+                if(goalBarEl){
+                    goalBarEl.style.width = pct + '%';
+                    goalBarEl.className = 'h-full transition-all duration-500 rounded-full ' + (pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-sky-500' : 'bg-amber-500');
+                }
+            } else {
+                if(metaStatusEl) metaStatusEl.textContent = 'Meta Asesor: No definida';
+                if(goalTxtEl) goalTxtEl.textContent = `${fmt(revVal)} vendidos`;
+                if(goalBarEl) goalBarEl.style.width = '0%';
+            }
+        } else {
+            monthlyFinEl.classList.add('hidden');
+        }
+    }
 
     if(!activeSales || activeSales.length === 0){
         if(emptyEl) emptyEl.classList.remove('hidden');
         if(contentEl) contentEl.classList.add('hidden');
+        if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
         return;
     }
     if(emptyEl) emptyEl.classList.add('hidden');
@@ -3385,17 +3618,18 @@ function upPosStats(){
     }).join('');
     document.getElementById('stat-ranking-list').innerHTML = rankingHtml || '<div class="text-slate-500 text-xs py-4 text-center">No hay productos vendidos.</div>';
 
-    renderCorrelationAnalysis(products);
+    renderCorrelationAnalysis(products, activeSales);
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
     lucide.createIcons();
 }
 
-function renderCorrelationAnalysis(products){
+function renderCorrelationAnalysis(products, periodSales){
     const container = document.getElementById('correlation-table');
     const insightsContainer = document.getElementById('correlation-insights');
-    const activeSales = (salesLog || []).filter(s => s.status !== 'cancelled');
+    const activeSales = periodSales || (salesLog || []).filter(s => s.status !== 'cancelled');
     if(!products || products.length < 2 || activeSales.length < 2){
         insightsContainer.innerHTML = '';
-        container.innerHTML = '<div class="text-slate-500 text-xs py-4 text-center">Se requieren al menos 2 productos con ventas registradas activas para calcular correlaciones cruzadas.</div>';
+        container.innerHTML = '<div class="text-slate-500 text-xs py-4 text-center">Se requieren al menos 2 productos con ventas registradas activas en el periodo para calcular correlaciones cruzadas.</div>';
         return;
     }
 
@@ -3574,29 +3808,75 @@ window.showPosTab = showPosTab;
 
 function exportPosDB(){const db={version:'1.0.0',exported:new Date().toISOString(),catalog,sales:salesLog,expenses};dl(db,'cfo_copilot_pos_database.json');toast('pos-toast');}
 
-function getPosFinancials(){
-    const allSales=JSON.parse(localStorage.getItem('pos_sales')||'[]');
-    const ex=JSON.parse(localStorage.getItem('pos_expenses')||'[]');
-    const sl = allSales.filter(s => s.status !== 'cancelled');
-    if(sl.length===0)return null;
-    const daySet=new Set();
-    let totalRev=0,totalCogs=0,totalExp=0;
-    sl.forEach(s=>{daySet.add(new Date(s.date).toDateString());totalRev+=s.total;totalCogs+=s.totalCost;});
-    ex.forEach(e=>{totalExp+=e.amount;});
-    const daysWithData=daySet.size;
-    if(daysWithData===0)return null;
-    const dailyAvgRev=totalRev/daysWithData;
-    const dailyAvgCost=(totalCogs+totalExp)/daysWithData;
+function getPosFinancials(monthFilter){
+    const allSales = (typeof salesLog !== 'undefined' && Array.isArray(salesLog) && salesLog.length > 0)
+        ? salesLog
+        : JSON.parse(localStorage.getItem('pos_sales') || '[]');
+    const allExpenses = (typeof expenses !== 'undefined' && Array.isArray(expenses) && expenses.length > 0)
+        ? expenses
+        : JSON.parse(localStorage.getItem('pos_expenses') || '[]');
+
+    const activeSalesAll = allSales.filter(s => s && s.status !== 'cancelled');
+    if(activeSalesAll.length === 0 && allExpenses.length === 0) return null;
+
+    const targetMonth = monthFilter || (typeof selectedStatsMonth !== 'undefined' ? selectedStatsMonth : getYearMonthKey(new Date()));
+    const sl = targetMonth === 'all'
+        ? activeSalesAll
+        : activeSalesAll.filter(s => getYearMonthKey(s.date) === targetMonth);
+    const ex = targetMonth === 'all'
+        ? allExpenses
+        : allExpenses.filter(e => getYearMonthKey(e.date) === targetMonth);
+
+    // Si el mes filtrado no tiene ventas ni gastos, pero hay datos en general, retornar estructura en cero para ese mes o null si ni siquiera hay datos globales
+    const daySet = new Set();
+    let totalRev = 0, totalCogs = 0;
+    let fixedExpenses = 0, variableExpenses = 0, otherExpenses = 0;
+
+    sl.forEach(s => {
+        if(s.date) daySet.add(new Date(s.date).toDateString());
+        totalRev += (Number(s.total) || 0);
+        totalCogs += (Number(s.totalCost) || 0);
+    });
+
+    ex.forEach(e => {
+        if(e.date) daySet.add(new Date(e.date).toDateString());
+        const amt = Number(e.amount) || 0;
+        const cat = (e.category || 'fijo').toLowerCase();
+        if(cat === 'fijo') fixedExpenses += amt;
+        else if(cat === 'variable') variableExpenses += amt;
+        else otherExpenses += amt;
+    });
+
+    const totalExp = fixedExpenses + variableExpenses + otherExpenses;
+    const totalVariableCosts = totalCogs + variableExpenses;
+    const totalOperatingCosts = fixedExpenses + totalVariableCosts + otherExpenses;
+    const daysWithData = Math.max(daySet.size, (sl.length > 0 || ex.length > 0) ? 1 : 0);
+
+    const dailyAvgRev = daysWithData > 0 ? totalRev / daysWithData : 0;
+    const dailyAvgCost = daysWithData > 0 ? totalOperatingCosts / daysWithData : 0;
+
     return {
-        totalSales:sl.length,
+        monthKey: targetMonth,
+        monthLabel: formatMonthKeyLabel(targetMonth),
+        totalSales: sl.length,
+        totalExpensesCount: ex.length,
         daysWithData,
-        totalRevenue:totalRev,
-        totalCogs,
-        totalExpenses:totalExp,
+        totalRevenue: Math.round(totalRev),
+        totalCogs: Math.round(totalCogs),
+        fixedExpenses: Math.round(fixedExpenses),
+        variableExpenses: Math.round(variableExpenses),
+        otherExpenses: Math.round(otherExpenses),
+        totalVariableCosts: Math.round(totalVariableCosts),
+        totalExpenses: Math.round(totalExp),
+        totalOperatingCosts: Math.round(totalOperatingCosts),
+        netProfit: Math.round(totalRev - totalOperatingCosts),
+        grossMarginDecimal: totalRev > 0 ? ((totalRev - totalVariableCosts) / totalRev) : null,
         dailyAvgRev,
         dailyAvgCost,
-        avgRevenue:Math.round(dailyAvgRev*30),
-        avgCost:Math.round(dailyAvgCost*30)
+        // En vista mensual usamos el monto real acumulado del mes (sin multiplicar artificialmente los gastos fijos por 30)
+        avgRevenue: Math.round(totalRev),
+        avgCost: Math.round(totalOperatingCosts),
+        projectedRevenue30d: Math.round(dailyAvgRev * 30)
     };
 }
 if(typeof window !== 'undefined') window.getPosFinancials = getPosFinancials;

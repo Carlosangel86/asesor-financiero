@@ -280,9 +280,22 @@ function buildTacticalMetricsBlock(S, R) {
         gapAnalysis = `ALERTA MATEMÁTICA: El margen deseado (${targetMarginPct}) es mayor o igual al Margen de Contribución (${contribMargin}), lo cual es matemáticamente inalcanzable sin reducir el costo de adquisición de refacciones o subir precios.`;
     }
 
+    let posLiveBlock = '';
+    if (posData) {
+        const realGap = targetSales !== null ? Math.max(0, targetSales - (posData.totalRevenue || 0)) : null;
+        posLiveBlock = `
+=== DATOS REALES EN VIVO DEL PUNTO DE VENTA (${posData.monthLabel || 'Mes Actual'}) ===
+- Ventas Reales Cobradas en Mostrador: ${fmt(posData.totalRevenue || 0)} MXN (${posData.totalSales || 0} tickets)
+- Gastos Fijos Registrados en POS: ${fmt(posData.fixedExpenses || 0)} MXN
+- Costos Variables Registrados en POS (Mercancía COGS ${fmt(posData.totalCogs || 0)} + Gastos Variables ${fmt(posData.variableExpenses || 0)}): ${fmt(posData.totalVariableCosts || 0)} MXN
+- Otros Gastos Extraordinarios POS: ${fmt(posData.otherExpenses || 0)} MXN
+- Utilidad Neta Real del Periodo en POS: ${fmt(posData.netProfit || 0)} MXN
+${realGap !== null ? `- Avance Real del Mostrador frente a la Meta (${fmt(targetSales)}): Faltan ${fmt(realGap)} MXN por cobrar en este mes.` : ''}`;
+    }
+
     return `
 === BLOQUE DE MÉTRICAS TÁCTICAS Y METAS FINANCIERAS ===
-- Ventas Actuales Registradas: ${currentSales !== null ? fmt(currentSales) + ' MXN/mes' : 'No registradas'}
+- Ventas Actuales Registradas (Escenario Activo): ${currentSales !== null ? fmt(currentSales) + ' MXN/mes' : 'No registradas'}
 - Costos Fijos Mensuales: ${fixedCostsVal !== null ? fmt(fixedCostsVal) + ' MXN/mes' : 'No registrados'}
 - Costos Totales Mensuales (Fijos + Variables): ${S.cost !== null ? fmt(S.cost) + ' MXN/mes' : 'No registrados'}
 - Inversión Inicial (Capital Invertido): ${invInicial} MXN
@@ -292,7 +305,7 @@ function buildTacticalMetricsBlock(S, R) {
 - Ventas Meta Calculadas: ${targetSales !== null ? fmt(targetSales) + ' MXN/mes (' + fmt(Math.round(targetSales / 30)) + ' MXN/día)' : 'Pendiente / Inviable'}
 - Punto de Equilibrio Formal: ${breakeven !== null ? fmt(breakeven) + ' MXN/mes' : 'No calculado'}
 - Retorno sobre Inversión Real (ROI = FCFF / Inversión Inicial): ${roiVal}
-- Diagnóstico de Brecha: ${gapAnalysis}
+- Diagnóstico de Brecha: ${gapAnalysis}${posLiveBlock}
 =======================================================`;
 }
 
@@ -621,11 +634,15 @@ function parse(txt){
     const fixedCostMatch = lo.match(/(?:costos?\s+fijos?|gastos?\s+fijos?)(?:\s+actuales|\s+mensuales|\s+totales|\s+ascienden\s+a|\s+suman|\s+son(?:\s+de)?|\s+de)?[^0-9$%]{0,30}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?(?!\s*%)/i);
     if(fixedCostMatch){
         S.fixed_costs = normalizeMoneyToken(fixedCostMatch[1], fixedCostMatch[2]);
+        S.pos_variable_expenses = 0;
+        S.pos_other_expenses = 0;
     }
 
     const totalCostMatch = lo.match(/(?:costos?(?!\s+fijos)(?:\s+operativos|\s+mensuales|\s+totales|\s+actuales|\s+ascienden\s+a|\s+suman|\s+son(?:\s+de)?|\s+de)?|gastos?(?!\s+fijos)(?:\s+operativos|\s+mensuales|\s+totales|\s+actuales|\s+ascienden\s+a|\s+suman|\s+de)?)[^0-9$%]{0,30}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?(?!\s*%)/i);
     if(totalCostMatch){
         S.cost = normalizeMoneyToken(totalCostMatch[1], totalCostMatch[2]);
+        S.pos_variable_expenses = 0;
+        S.pos_other_expenses = 0;
     } else if(S.fixed_costs !== null && S.cost === null){
         // Inicializar S.cost con S.fixed_costs; calc() sumará el costo variable si hay ventas y margen bruto
         S.cost = S.fixed_costs;
@@ -724,11 +741,13 @@ function calc(){
         S.gross_margin = S.gross_margin / 100;
     }
 
-    // Caso 1: Si el usuario ingresó Costos (ej. Costos Fijos) y Margen Meta, pero aún no tiene Ventas (S.rev === null)
-    if(S.rev === null && (S.cost !== null || S.fixed_costs !== null)){
+    // Caso 1: Si el usuario ingresó Costos (ej. Costos Fijos del POS) y Margen Meta, pero aún no tiene Ventas (S.rev === null o 0)
+    if((S.rev === null || S.rev === 0) && (S.cost !== null || S.fixed_costs !== null)){
         const estMcDecimal = (S.gross_margin !== null && S.gross_margin > 0) ? S.gross_margin : getCatalogAverageContributionMargin();
-        const fixedCostsOnly = (S.fixed_costs !== null && S.fixed_costs > 0) ? S.fixed_costs : S.cost;
-        if(S.cost === null) S.cost = fixedCostsOnly;
+        const fixedCostsOnly = (S.fixed_costs !== null && S.fixed_costs > 0) ? S.fixed_costs : (S.cost || 0);
+        const extraPosVar = (Number(S.pos_variable_expenses) || 0) + (Number(S.pos_other_expenses) || 0);
+        if(S.cost === null || S.cost === 0) S.cost = fixedCostsOnly + extraPosVar;
+        R.cf.ebitda = -(S.cost * 12);
         R.ratios.grossMargin = estMcDecimal * 100;
         R.ratios.contributionMargin = estMcDecimal * 100;
         R.ratios.formalBreakeven = estMcDecimal > 0 ? Math.round(fixedCostsOnly / estMcDecimal) : null;
@@ -755,37 +774,43 @@ function calc(){
         return R;
     }
 
-    if(S.rev === null || (S.cost === null && S.fixed_costs === null)) return R;
+    if(S.rev === null || S.rev === 0 || (S.cost === null && S.fixed_costs === null)) return R;
 
     // ===== SEGREGACIÓN EXACTA DE COSTOS FIJOS VS VARIABLES & MARGEN DE CONTRIBUCIÓN =====
     let fixedCosts = 0;
     let variableCosts = 0;
     let mcDecimal = 0;
+    const posExtraVar = Number(S.pos_variable_expenses) || 0;
+    const posExtraOther = Number(S.pos_other_expenses) || 0;
 
     if(S.fixed_costs !== null && S.fixed_costs > 0){
         fixedCosts = S.fixed_costs;
         if(S.gross_margin !== null && S.gross_margin > 0){
-            // Caso exacto del plan financiero: Costos fijos explícitos ($45,000) + Margen Bruto estándar (40%)
-            mcDecimal = S.gross_margin;
-            variableCosts = Math.round(S.rev * (1 - mcDecimal));
-            S.cost = Math.round(fixedCosts + variableCosts);
+            // Caso exacto del plan financiero: Costos fijos explícitos ($45,000) + Margen Bruto estándar (40%) + posibles gastos variables del POS
+            const baseCogs = Math.round(S.rev * (1 - S.gross_margin));
+            variableCosts = baseCogs + posExtraVar;
+            mcDecimal = posExtraVar > 0 && S.rev > 0
+                ? Math.max(0.01, (S.rev - variableCosts) / S.rev)
+                : S.gross_margin;
+            S.cost = Math.round(fixedCosts + variableCosts + posExtraOther);
         } else if(S.cost !== null && S.cost > fixedCosts){
             variableCosts = S.cost - fixedCosts;
             mcDecimal = S.rev > 0 ? (S.rev - variableCosts) / S.rev : 0;
         } else {
             mcDecimal = getCatalogAverageContributionMargin();
-            variableCosts = Math.round(S.rev * (1 - mcDecimal));
-            S.cost = Math.round(fixedCosts + variableCosts);
+            variableCosts = Math.round(S.rev * (1 - mcDecimal)) + posExtraVar;
+            if(posExtraVar > 0 && S.rev > 0) mcDecimal = Math.max(0.01, (S.rev - variableCosts) / S.rev);
+            S.cost = Math.round(fixedCosts + variableCosts + posExtraOther);
         }
     } else {
         // Solo se proporcionaron costos operativos totales (S.cost)
         if(S.gross_margin !== null && S.gross_margin > 0){
             mcDecimal = S.gross_margin;
-            variableCosts = Math.round(S.rev * (1 - mcDecimal));
+            variableCosts = Math.round(S.rev * (1 - mcDecimal)) + posExtraVar;
             fixedCosts = Math.max(0, S.cost - variableCosts);
         } else {
             const cvRatio = 0.65;
-            variableCosts = S.cost * cvRatio;
+            variableCosts = (S.cost * cvRatio) + posExtraVar;
             fixedCosts = S.cost * (1 - cvRatio);
             mcDecimal = S.rev > 0 ? (S.rev - variableCosts) / S.rev : 0;
         }
@@ -1096,6 +1121,7 @@ function upDash(R){
         h+='</tbody></table>';
         document.getElementById('amTbl').innerHTML=h;
     }
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
 }
 
 // Razones panel update

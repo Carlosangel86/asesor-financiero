@@ -1,4 +1,4 @@
-﻿// ===== NAVEGACIÓN, ORQUESTACIÓN & ARRANQUE DE LA APLICACIÓN =====
+// ===== NAVEGACIÓN, ORQUESTACIÓN & ARRANQUE DE LA APLICACIÓN =====
 
 // ===== CONTROL RESPONSIVO MÓVIL (< 1024px) =====
 let mobilePosActiveCol = 'ops';   // 'ops' | 'stats'
@@ -277,20 +277,20 @@ function renderAlmacenDashboard(){
     lucide.createIcons();
 }
 
-function syncAndGoToAdvisor(){
+function syncAndGoToAdvisor(monthKey){
     goTo('advisor');
-    syncFromPos();
+    syncFromPos(monthKey);
 }
 
 function updateMenuIndicators(){
-    const posData = getPosFinancials();
+    const posData = typeof getPosFinancials === 'function' ? getPosFinancials() : null;
     const ind = document.getElementById('menu-pos-indicator');
     const cnt = document.getElementById('menu-pos-count');
-    if(posData){
+    if(posData && (posData.totalSales > 0 || posData.totalExpensesCount > 0)){
         if(ind) ind.classList.remove('hidden');
         if(cnt){
             cnt.classList.remove('hidden');
-            cnt.innerHTML = `<i data-lucide="database" class="w-3 h-3"></i>${posData.totalSales} ventas · ${posData.daysWithData} día(s)`;
+            cnt.innerHTML = `<i data-lucide="database" class="w-3 h-3"></i>${posData.totalSales} ventas · ${posData.totalExpensesCount || 0} gastos`;
         }
     } else {
         if(ind) ind.classList.add('hidden');
@@ -338,26 +338,39 @@ function updateMenuIndicators(){
 }
 
 function checkPosData(){
-    const posData=getPosFinancials();
-    const banner=document.getElementById('pos-sync-banner');
-    if(!posData){banner.classList.add('hidden');return;}
-    // Show sync banner if we have POS data and haven't synced yet (or data changed)
-    const alreadySynced=(S.rev===posData.avgRevenue && S.cost===posData.avgCost);
-    if(alreadySynced){banner.classList.add('hidden');return;}
+    if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+    const posData = typeof getPosFinancials === 'function' ? getPosFinancials() : null;
+    const banner = document.getElementById('pos-sync-banner');
+    if(!banner) return;
+    if(!posData || (posData.totalSales === 0 && (posData.totalExpensesCount || 0) === 0)){
+        banner.classList.add('hidden');
+        return;
+    }
+    // Verificar si ya está sincronizado con los mismos valores
+    const alreadySynced = (
+        (posData.totalSales > 0 ? S.rev === posData.totalRevenue : true) &&
+        (posData.fixedExpenses > 0 ? S.fixed_costs === posData.fixedExpenses : true) &&
+        (S.pos_variable_expenses === (posData.variableExpenses || 0))
+    );
+    if(alreadySynced && (S.rev !== null || S.fixed_costs !== null)){
+        banner.classList.add('hidden');
+        return;
+    }
     banner.classList.remove('hidden');
     banner.innerHTML=`
     <div class="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/8 backdrop-blur-md">
         <div class="flex items-start gap-3">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-600/20"><i data-lucide="link-2" class="text-white w-5 h-5"></i></div>
             <div class="flex-1">
-                <div class="text-sm font-bold text-emerald-300 mb-1 flex items-center gap-2">Datos del Punto de Venta disponibles <span class="pill bg-emerald-900/60 text-emerald-400 border border-emerald-700/50">POS</span></div>
+                <div class="text-sm font-bold text-emerald-300 mb-1 flex items-center gap-2">Datos reales del Mostrador disponibles <span class="pill bg-emerald-900/60 text-emerald-400 border border-emerald-700/50">${posData.monthLabel || 'POS'}</span></div>
                 <div class="text-[12px] text-emerald-200/80 leading-relaxed mb-2.5">
-                    Se detectaron <b>${posData.totalSales} ventas</b> en <b>${posData.daysWithData} día(s)</b> registrado(s).
-                    <br>Promedio mensual estimado: <b class="text-emerald-400">${fmt(posData.avgRevenue)}</b> en ventas · <b class="text-rose-400">${fmt(posData.avgCost)}</b> en costos (COGS + gastos).
+                    Registros del periodo: <b>${posData.totalSales} venta(s)</b> (<b class="text-emerald-400">${fmt(posData.totalRevenue)}</b>) ·
+                    Gastos Fijos: <b class="text-rose-400">${fmt(posData.fixedExpenses)}</b> ·
+                    Costos Variables (Mercancía + Var): <b class="text-amber-400">${fmt(posData.totalVariableCosts)}</b>.
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="syncFromPos()" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white text-[11px]"><i data-lucide="zap" class="w-3.5 h-3.5"></i>Sincronizar con POS</button>
-                    <button onclick="document.getElementById('pos-sync-banner').classList.add('hidden')" class="pos-btn bg-slate-700/60 hover:bg-slate-600 text-slate-300 text-[11px]"><i data-lucide="x" class="w-3.5 h-3.5"></i>Ignorar</button>
+                    <button onclick="syncFromPos('${posData.monthKey || ''}')" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white text-[11px]"><i data-lucide="zap" class="w-3.5 h-3.5"></i>Sincronizar con Dashboard</button>
+                    <button onclick="document.getElementById('pos-sync-banner').classList.add('hidden')" class="pos-btn bg-slate-700/60 hover:bg-slate-600 text-slate-300 text-[11px]"><i data-lucide="x" class="w-3.5 h-3.5"></i>Mantener Simulación Actual</button>
                 </div>
             </div>
         </div>
@@ -365,66 +378,108 @@ function checkPosData(){
     lucide.createIcons();
 }
 
-function getPosFinancials(){
-    const allSales=JSON.parse(localStorage.getItem('pos_sales')||'[]');
-    const ex=JSON.parse(localStorage.getItem('pos_expenses')||'[]');
-    const sl = allSales.filter(s => s.status !== 'cancelled');
-    if(sl.length===0)return null;
-    // Get unique days that have sales
-    const daySet=new Set();
-    let totalRev=0,totalCogs=0,totalExp=0;
-    sl.forEach(s=>{daySet.add(new Date(s.date).toDateString());totalRev+=s.total;totalCogs+=s.totalCost;});
-    ex.forEach(e=>{totalExp+=e.amount;});
-    const daysWithData=daySet.size;
-    if(daysWithData===0)return null;
-    // Estimate monthly: daily average * 30
-    const dailyAvgRev=totalRev/daysWithData;
-    const dailyAvgCost=(totalCogs+totalExp)/daysWithData;
-    return {
-        totalSales:sl.length,
-        daysWithData,
-        totalRevenue:totalRev,
-        totalCogs,
-        totalExpenses:totalExp,
-        dailyAvgRev,
-        dailyAvgCost,
-        avgRevenue:Math.round(dailyAvgRev*30),
-        avgCost:Math.round(dailyAvgCost*30)
-    };
-}
+async function syncFromPos(monthKey){
+    const posData = typeof getPosFinancials === 'function' ? getPosFinancials(monthKey) : null;
+    if(!posData || (posData.totalSales === 0 && (posData.totalExpensesCount || 0) === 0)){
+        alert('Aún no hay ventas ni gastos registrados en el Punto de Venta para este periodo.');
+        return;
+    }
+    if(busy) return;
 
-async function syncFromPos(){
-    const posData=getPosFinancials();
-    if(!posData)return;
-    // Inject into state
-    S.rev=posData.avgRevenue;
-    S.cost=posData.avgCost;
-    // Hide banner
-    document.getElementById('pos-sync-banner').classList.add('hidden');
-    // Show as user message
-    const userMsg = `📊 Sincronizar datos del Punto de Venta: Ventas promedio ${fmt(posData.avgRevenue)}/mes, Costos ${fmt(posData.avgCost)}/mes (calculado de ${posData.totalSales} ventas en ${posData.daysWithData} día(s))`;
-    addMsg(userMsg,'u');
-    // Process through engine
-    if(busy)return;
-    busy=true;document.getElementById('iw').classList.add('lock');document.getElementById('hints').innerHTML='';
-    document.getElementById('typ').classList.remove('hidden');
+    // 1. Conectar Costos Fijos, Variables y Otros clasificados en el POS al estado del Asesor (S)
+    if(posData.fixedExpenses > 0){
+        S.fixed_costs = posData.fixedExpenses;
+    }
+    S.pos_variable_expenses = posData.variableExpenses || 0;
+    S.pos_other_expenses = posData.otherExpenses || 0;
+
+    // 2. Conectar Ventas si existen ventas cobradas en el periodo; si solo hay gastos, preservar o calcular punto de equilibrio
+    if(posData.totalSales > 0){
+        S.rev = posData.totalRevenue;
+        S.cost = posData.totalOperatingCosts;
+        if(posData.grossMarginDecimal !== null && posData.grossMarginDecimal > 0){
+            S.gross_margin = Number(posData.grossMarginDecimal.toFixed(4));
+        }
+    } else {
+        if(S.rev === null || S.rev === 0){
+            S.cost = posData.totalOperatingCosts;
+        }
+    }
+
+    const bannerEl = document.getElementById('pos-sync-banner');
+    if(bannerEl) bannerEl.classList.add('hidden');
+
+    const periodTitle = posData.monthLabel || 'Mes Actual';
+    const userMsg = `📊 Sincronizar corte real de Mostrador (${periodTitle}): Ventas ${fmt(posData.totalRevenue)}, Gastos Fijos ${fmt(posData.fixedExpenses)}, Costos Variables ${fmt(posData.totalVariableCosts)}${posData.otherExpenses > 0 ? ', Otros ' + fmt(posData.otherExpenses) : ''}.`;
+    addMsg(userMsg, 'u');
+
+    busy = true;
+    const iwEl = document.getElementById('iw');
+    if(iwEl) iwEl.classList.add('lock');
+    const hintsEl = document.getElementById('hints');
+    if(hintsEl) hintsEl.innerHTML = '';
+    const typEl = document.getElementById('typ');
+    if(typEl) typEl.classList.remove('hidden');
+
     try{
-        alog('POS Sync — importing data');await phase('Orch','SYNCING POS','bg-emerald-500',600);
-        document.getElementById('oJ').textContent=JSON.stringify(S,null,2);upQ();st('Orch','POS SYNCED','bg-emerald-600');
-        await phase('Eng','CALCULATING','bg-amber-500',500);const R=calc();
-        document.getElementById('oJ').textContent=JSON.stringify(S,null,2);
-        document.getElementById('oM').textContent=JSON.stringify(R,null,2);st('Eng','DONE','bg-emerald-600');upDash(R);upRatios(R);
+        alog('POS Sync — importing segregated monthly data');
+        await phase('Orch','SYNCING POS','bg-emerald-500',500);
+        const oJ = document.getElementById('oJ');
+        if(oJ) oJ.textContent = JSON.stringify(S,null,2);
+        upQ();
+        st('Orch','POS SYNCED','bg-emerald-600');
+
+        await phase('Eng','CALCULATING','bg-amber-500',400);
+        const R = calc();
+        if(oJ) oJ.textContent = JSON.stringify(S,null,2);
+        const oM = document.getElementById('oM');
+        if(oM) oM.textContent = JSON.stringify(R,null,2);
+        st('Eng','DONE','bg-emerald-600');
+        upDash(R);
+        upRatios(R);
         if(typeof upPosSummary === 'function') upPosSummary();
-        alog('POS data integrated');await slp(500);document.getElementById('typ').classList.add('hidden');
-        let msg=`<div class="flex items-center gap-2 mb-2"><span class="pill bg-emerald-900/60 text-emerald-400 border border-emerald-700/50"><i data-lucide="link-2" class="w-3 h-3 inline"></i> POS Sync</span><span class="text-emerald-400 font-bold text-[11px]">Datos importados correctamente</span></div>`;
-        msg+=`<div class="grid grid-cols-2 gap-2 my-2"><div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-slate-700/30"><div class="text-[8px] text-slate-500 uppercase font-bold">Ventas/Mes</div><div class="text-sm font-bold mono text-emerald-400 mt-1">${fmt(posData.avgRevenue)}</div></div><div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-slate-700/30"><div class="text-[8px] text-slate-500 uppercase font-bold">Costos/Mes</div><div class="text-sm font-bold mono text-rose-400 mt-1">${fmt(posData.avgCost)}</div></div></div>`;
-        msg+=exp("Datos del POS","Se calculó el promedio mensual tomando tus ventas reales de "+posData.daysWithData+" día(s) y proyectándolas a 30 días. Incluye el costo de producción de cada producto vendido más los gastos operativos que registraste.");
-        msg+=narrate(R);
-        addMsg(msg,'b');advStep();saveAdv(R, userMsg);
-        // Call local LLM for advanced suggestions based on POS data
+        if(typeof updateAdvisorPosLiveBar === 'function') updateAdvisorPosLiveBar();
+
+        alog('POS data integrated');
+        await slp(400);
+        if(typEl) typEl.classList.add('hidden');
+
+        let msg = `<div class="flex items-center gap-2 mb-2"><span class="pill bg-emerald-900/60 text-emerald-400 border border-emerald-700/50"><i data-lucide="link-2" class="w-3 h-3 inline"></i> POS Sync · ${periodTitle}</span><span class="text-emerald-400 font-bold text-[11px]">Corte sincronizado con éxito</span></div>`;
+        msg += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 my-2">
+            <div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-emerald-500/25">
+                <div class="text-[8px] text-emerald-400 uppercase font-bold">Ventas Periodo</div>
+                <div class="text-sm font-bold mono text-emerald-400 mt-1">${fmt(posData.totalRevenue)}</div>
+            </div>
+            <div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-rose-500/25">
+                <div class="text-[8px] text-rose-400 uppercase font-bold">Gastos Fijos</div>
+                <div class="text-sm font-bold mono text-rose-400 mt-1">${fmt(posData.fixedExpenses)}</div>
+            </div>
+            <div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-amber-500/25">
+                <div class="text-[8px] text-amber-400 uppercase font-bold">Costos Variables</div>
+                <div class="text-sm font-bold mono text-amber-400 mt-1">${fmt(posData.totalVariableCosts)}</div>
+            </div>
+            <div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-slate-700/40">
+                <div class="text-[8px] text-slate-400 uppercase font-bold">Otros Gastos</div>
+                <div class="text-sm font-bold mono text-slate-300 mt-1">${fmt(posData.otherExpenses)}</div>
+            </div>
+        </div>`;
+        msg += exp("Integración Contable Mostrador ➔ Asesor", `Se integraron los registros reales de <b>${periodTitle}</b> clasificando los Gastos Fijos (${fmt(posData.fixedExpenses)}) en tu estructura mensual y sumando los Gastos Variables (${fmt(posData.variableExpenses)}) más el costo de refacciones vendidas (${fmt(posData.totalCogs)}) como Costos Variables.`);
+        addMsg(msg,'b');
+        advStep();
+        saveAdv(R, userMsg);
         askOllama(userMsg, R, S);
-    }catch(e){alog('[ERR] '+e.message);document.getElementById('typ').classList.add('hidden');addMsg('Error al sincronizar. Revisa logs.','b');}
-    finally{busy=false;document.getElementById('iw').classList.remove('lock');}
+    }catch(e){
+        alog('[ERR] '+e.message);
+        if(typEl) typEl.classList.add('hidden');
+        addMsg('Error al sincronizar. Revisa logs.','b');
+    }finally{
+        busy = false;
+        if(iwEl) iwEl.classList.remove('lock');
+    }
+}
+if(typeof window !== 'undefined'){
+    window.syncFromPos = syncFromPos;
+    window.syncAndGoToAdvisor = syncAndGoToAdvisor;
 }
 
 
