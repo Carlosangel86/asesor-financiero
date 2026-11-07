@@ -601,6 +601,28 @@ export const StatsService = {
             console.error('[Firestore Stats.saveExpenses Error]', e);
             return false;
         }
+    },
+
+    async getAdvisorState() {
+        try {
+            const docRef = doc(db, 'stats', 'advisor_state');
+            const snap = await getDoc(docRef);
+            return snap.exists() ? snap.data() : null;
+        } catch (e) {
+            console.error('[Firestore Stats.getAdvisorState Error]', e);
+            return null;
+        }
+    },
+
+    async saveAdvisorState(stateData) {
+        try {
+            const docRef = doc(db, 'stats', 'advisor_state');
+            await setDoc(docRef, { ...stateData, updatedAt: serverTimestamp() }, { merge: true });
+            return true;
+        } catch (e) {
+            console.error('[Firestore Stats.saveAdvisorState Error]', e);
+            return false;
+        }
     }
 };
 

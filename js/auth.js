@@ -1,4 +1,4 @@
-// ===== CONTROL DE ACCESO BASADO EN ROLES (RBAC) & GESTIÓN DE USUARIOS =====
+﻿// ===== CONTROL DE ACCESO BASADO EN ROLES (RBAC) & GESTIÓN DE USUARIOS =====
 // Sistema Empresarial Seguro con Firebase Authentication & Cloud Firestore
 
 // DEMO_MODE desactivado permanentemente para exigir autenticación real
@@ -607,6 +607,12 @@ function applyRoleUI(){
     const canAccessAdv = hasPermission('finance.view_analysis') || hasPermission('ai.qwen_access') || hasPermission('ai.tax_access');
     if(btnGotoAdv) btnGotoAdv.classList.toggle('hidden', !canAccessAdv);
 
+    const btnAdvReset = document.getElementById('btn-adv-reset');
+    if(btnAdvReset){
+        const canResetAdv = role === 'admin' || role === 'supervisor';
+        btnAdvReset.classList.toggle('hidden', !canResetAdv);
+    }
+
     if(btnPosStats) btnPosStats.classList.toggle('hidden', !canViewStats);
     if(btnPosToday) btnPosToday.classList.toggle('hidden', !canViewToday);
     if(btnPosAlmacen) btnPosAlmacen.classList.toggle('hidden', !canViewAlmacen);
@@ -632,6 +638,7 @@ function applyRoleUI(){
     if(hasPermission('users.manage')) renderUsersList();
     if(hasPermission('sales.approve_cancel')) renderCancelRequests();
     renderAuditLog();
+    if(typeof restoreAdvisorState === 'function') restoreAdvisorState();
     if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
 }
 

@@ -1,4 +1,4 @@
-// ===== MÓDULO DE PUNTO DE VENTA (POS), CATÁLOGO & ESTADÍSTICAS =====
+﻿// ===== MÓDULO DE PUNTO DE VENTA (POS), CATÁLOGO & ESTADÍSTICAS =====
 
 // ===== POS MODULE =====
 const REFACCIONES_CATALOG = [
@@ -3055,6 +3055,40 @@ function upPosSummary(){
     if(cashPctEl) cashPctEl.textContent = totalSales > 0 ? ((todayCash / totalSales) * 100).toFixed(0) + '%' : '0%';
     if(cardPctEl) cardPctEl.textContent = totalSales > 0 ? ((todayCard / totalSales) * 100).toFixed(0) + '%' : '0%';
     if(transferPctEl) transferPctEl.textContent = totalSales > 0 ? ((todayTransfer / totalSales) * 100).toFixed(0) + '%' : '0%';
+
+    // ===== BARRA DE AVANCE DIARIA DE VENTAS META (VISIBLE PARA CAJERO Y DEMÁS ROLES SIN EXPONER COSTOS/MÁRGENES) =====
+    let monthlyGoalRef = (window.S && window.S.target_sales && window.S.target_sales > 0) ? window.S.target_sales : null;
+    if(!monthlyGoalRef){
+        try {
+            const savedAdv = JSON.parse(localStorage.getItem('cfo_adv_active_state') || 'null');
+            if(savedAdv && savedAdv.inputs && savedAdv.inputs.target_sales > 0){
+                monthlyGoalRef = savedAdv.inputs.target_sales;
+            } else if(savedAdv && savedAdv.results && savedAdv.results.ratios && savedAdv.results.ratios.formalBreakeven > 0){
+                monthlyGoalRef = savedAdv.results.ratios.formalBreakeven;
+            }
+        } catch(e){}
+    }
+    const dailyGoal = monthlyGoalRef ? Math.round(monthlyGoalRef / 30) : 5000;
+    const rawPct = dailyGoal > 0 ? Math.round((totalSales / dailyGoal) * 100) : 0;
+    const barPct = Math.min(Math.max(rawPct, 0), 100);
+    const barColorClass = rawPct >= 100 ? 'bg-emerald-500' : rawPct >= 60 ? 'bg-sky-500' : 'bg-amber-500';
+
+    ['pos-cashier-goal', 'pos-today-goal'].forEach(prefix => {
+        const barEl = document.getElementById(prefix + '-bar');
+        const txtEl = document.getElementById(prefix + '-txt');
+        const pctEl = document.getElementById(prefix + '-pct');
+        if(barEl){
+            barEl.style.width = barPct + '%';
+            barEl.className = 'h-full transition-all duration-500 rounded-full ' + barColorClass;
+        }
+        if(txtEl){
+            txtEl.innerHTML = <b class="text-white font-mono"></b> vendidos de <b class="text-emerald-300 font-mono"></b> meta del día;
+        }
+        if(pctEl){
+            pctEl.textContent = rawPct + '%';
+            pctEl.className = 'text-xs font-bold mono ' + (rawPct >= 100 ? 'text-emerald-400' : rawPct >= 60 ? 'text-sky-400' : 'text-amber-400');
+        }
+    });
 
     // Historial del Día con badges de pago, cancelación y estado
     if(relevantHistorySales.length === 0){

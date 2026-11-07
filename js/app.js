@@ -1,4 +1,4 @@
-// ===== NAVEGACIÓN, ORQUESTACIÓN & ARRANQUE DE LA APLICACIÓN =====
+﻿// ===== NAVEGACIÓN, ORQUESTACIÓN & ARRANQUE DE LA APLICACIÓN =====
 
 // ===== CONTROL RESPONSIVO MÓVIL (< 1024px) =====
 let mobilePosActiveCol = 'ops';   // 'ops' | 'stats'
@@ -134,6 +134,7 @@ function goTo(v){
         if (window.innerWidth < 1024) switchMobilePosView(mobilePosActiveCol);
     }
     if(v === 'advisor'){
+        if(typeof restoreAdvisorState === 'function') restoreAdvisorState();
         checkPosData();
         updateInitialHints();
         if (window.innerWidth < 1024) switchMobileAdvView(mobileAdvActiveCol);
@@ -411,13 +412,15 @@ async function syncFromPos(){
         alog('POS Sync — importing data');await phase('Orch','SYNCING POS','bg-emerald-500',600);
         document.getElementById('oJ').textContent=JSON.stringify(S,null,2);upQ();st('Orch','POS SYNCED','bg-emerald-600');
         await phase('Eng','CALCULATING','bg-amber-500',500);const R=calc();
+        document.getElementById('oJ').textContent=JSON.stringify(S,null,2);
         document.getElementById('oM').textContent=JSON.stringify(R,null,2);st('Eng','DONE','bg-emerald-600');upDash(R);upRatios(R);
+        if(typeof upPosSummary === 'function') upPosSummary();
         alog('POS data integrated');await slp(500);document.getElementById('typ').classList.add('hidden');
         let msg=`<div class="flex items-center gap-2 mb-2"><span class="pill bg-emerald-900/60 text-emerald-400 border border-emerald-700/50"><i data-lucide="link-2" class="w-3 h-3 inline"></i> POS Sync</span><span class="text-emerald-400 font-bold text-[11px]">Datos importados correctamente</span></div>`;
         msg+=`<div class="grid grid-cols-2 gap-2 my-2"><div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-slate-700/30"><div class="text-[8px] text-slate-500 uppercase font-bold">Ventas/Mes</div><div class="text-sm font-bold mono text-emerald-400 mt-1">${fmt(posData.avgRevenue)}</div></div><div class="bg-slate-800/40 rounded-lg p-2.5 text-center border border-slate-700/30"><div class="text-[8px] text-slate-500 uppercase font-bold">Costos/Mes</div><div class="text-sm font-bold mono text-rose-400 mt-1">${fmt(posData.avgCost)}</div></div></div>`;
         msg+=exp("Datos del POS","Se calculó el promedio mensual tomando tus ventas reales de "+posData.daysWithData+" día(s) y proyectándolas a 30 días. Incluye el costo de producción de cada producto vendido más los gastos operativos que registraste.");
         msg+=narrate(R);
-        addMsg(msg,'b');advStep();saveAdv(R);
+        addMsg(msg,'b');advStep();saveAdv(R, userMsg);
         // Call local LLM for advanced suggestions based on POS data
         askOllama(userMsg, R, S);
     }catch(e){alog('[ERR] '+e.message);document.getElementById('typ').classList.add('hidden');addMsg('Error al sincronizar. Revisa logs.','b');}
