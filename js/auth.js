@@ -671,11 +671,16 @@ function showUsersSubSection(subSec){
             }
         }
     });
-    if(subSec === 'users') renderUsersList();
-    if(subSec === 'requests') renderCancelRequests();
-    if(subSec === 'audit') renderAuditLog();
+    try {
+        if(subSec === 'users' && typeof renderUsersList === 'function') renderUsersList();
+        if(subSec === 'requests' && typeof renderCancelRequests === 'function') renderCancelRequests();
+        if(subSec === 'audit' && typeof renderAuditLog === 'function') renderAuditLog();
+    } catch(e) {
+        console.warn('[showUsersSubSection render error]', e);
+    }
     if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
 }
+window.showUsersSubSection = showUsersSubSection;
 
 async function handleCreateUserForm(event){
     event.preventDefault();
@@ -815,6 +820,7 @@ async function resetUserPassword(userId){
 }
 
 function renderUsersList(){
+
     const container = document.getElementById('users-table-list');
     const badge = document.getElementById('users-count-badge');
     if(!container) return;
@@ -867,3 +873,5 @@ function renderUsersList(){
     }).join('');
     if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
 }
+
+window.renderUsersList = renderUsersList;

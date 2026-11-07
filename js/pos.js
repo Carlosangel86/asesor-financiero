@@ -1,4 +1,4 @@
-﻿// ===== MÓDULO DE PUNTO DE VENTA (POS), CATÁLOGO & ESTADÍSTICAS =====
+// ===== MÓDULO DE PUNTO DE VENTA (POS), CATÁLOGO & ESTADÍSTICAS =====
 
 // ===== POS MODULE =====
 const REFACCIONES_CATALOG = [
@@ -3082,7 +3082,7 @@ function upPosSummary(){
             barEl.className = 'h-full transition-all duration-500 rounded-full ' + barColorClass;
         }
         if(txtEl){
-            txtEl.innerHTML = <b class="text-white font-mono"></b> vendidos de <b class="text-emerald-300 font-mono"></b> meta del día;
+            txtEl.innerHTML = `<b class="text-white font-mono">${fmt(totalSales)}</b> vendidos de <b class="text-emerald-300 font-mono">${fmt(dailyGoal)}</b> meta del día`;
         }
         if(pctEl){
             pctEl.textContent = rawPct + '%';
@@ -3529,7 +3529,7 @@ function showPosTab(t){
     }
 
     const pvAnalista = document.getElementById('pv-analista-info');
-    if(pvAnalista && currentUser.role !== 'analista') pvAnalista.classList.add('hidden');
+    if(pvAnalista && currentUser && currentUser.role !== 'analista') pvAnalista.classList.add('hidden');
 
     if (window.innerWidth < 1024 && typeof switchMobilePosView === 'function') {
         switchMobilePosView('ops');
@@ -3551,19 +3551,26 @@ function showPosTab(t){
         }
     });
 
-    if(t === 'sell'){
-        updateProductSelect();
-        onSellProductChange();
-        setPaymentMethod(currentPaymentMethod);
-        updatePaymentTotals();
+    try {
+        if(t === 'sell'){
+            if(typeof updateProductSelect === 'function') updateProductSelect();
+            if(typeof onSellProductChange === 'function') onSellProductChange();
+            if(typeof setPaymentMethod === 'function') setPaymentMethod(currentPaymentMethod);
+            if(typeof updatePaymentTotals === 'function') updatePaymentTotals();
+        }
+        if(t === 'catalog' && typeof renderCatalog === 'function') renderCatalog();
+        if(t === 'expense' && typeof renderExpenses === 'function') renderExpenses();
+        if(t === 'users'){
+            if(typeof showUsersSubSection === 'function'){
+                showUsersSubSection(typeof currentUsersSubSection !== 'undefined' ? currentUsersSubSection : 'users');
+            }
+        }
+    } catch(err) {
+        console.error('[showPosTab render error]', err);
     }
-    if(t === 'catalog') renderCatalog();
-    if(t === 'expense') renderExpenses();
-    if(t === 'users'){
-        showUsersSubSection(currentUsersSubSection || 'users');
-    }
-    lucide.createIcons();
+    if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
 }
+window.showPosTab = showPosTab;
 
 function exportPosDB(){const db={version:'1.0.0',exported:new Date().toISOString(),catalog,sales:salesLog,expenses};dl(db,'cfo_copilot_pos_database.json');toast('pos-toast');}
 
