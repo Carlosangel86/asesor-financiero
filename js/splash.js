@@ -49,9 +49,12 @@
         // Al finalizar los 6 segundos de animación, desvanecer e ingresar al sistema
         video.addEventListener('ended', window.dismissSplash);
 
-        // Fallback cuando se acerque al final de la reproducción
+        // Límite máximo estricto: después de 6.2 segundos, descartar splash automáticamente
+        setTimeout(window.dismissSplash, 6200);
+
+        // Fallback cuando se acerque al final de la reproducción o alcance 6s
         video.addEventListener('timeupdate', () => {
-            if(!dismissed && video.duration && (video.duration - video.currentTime <= 0.1)){
+            if(!dismissed && ((video.duration && (video.duration - video.currentTime <= 0.15)) || video.currentTime >= 6.0)){
                 window.dismissSplash();
             }
         });

@@ -1122,6 +1122,76 @@ async function reloadRefaccionesCatalog(){
 function initPosChart(){if(posChart)posChart.destroy();posChart=new Chart(document.getElementById('cPosBars'),{type:'bar',data:{labels:[],datasets:[{label:'Ventas ($)',data:[],backgroundColor:'rgba(16,185,129,.55)',borderRadius:8,borderSkipped:false},{label:'Costo ($)',data:[],backgroundColor:'rgba(244,63,94,.35)',borderRadius:8,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{ticks:{callback:v=>'$'+v},grid:{color:'rgba(51,65,85,.3)'},border:{display:false}},y:{ticks:{font:{size:10}},grid:{display:false},border:{display:false}}}}});}
 initPosChart();
 
+// ===== MANEJO DE FOTOGRAFÍA / IMAGEN DE PRODUCTO =====
+let currentCatImageData = '';
+
+function handleCatImageFile(input) {
+    if (!input || !input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            // Comprimir y redimensionar imagen en canvas a un máximo balanceado de 480x480
+            const maxDim = 480;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            currentCatImageData = canvas.toDataURL('image/jpeg', 0.82);
+
+            // Actualizar vista previa
+            const preview = document.getElementById('cat-img-preview');
+            const placeholder = document.getElementById('cat-img-placeholder-icon');
+            const clearBtn = document.getElementById('cat-img-clear-btn');
+            const nameEl = document.getElementById('cat-img-filename');
+            const btnText = document.getElementById('cat-img-btn-text');
+
+            if (preview) { preview.src = currentCatImageData; preview.classList.remove('hidden'); }
+            if (placeholder) placeholder.classList.add('hidden');
+            if (clearBtn) clearBtn.classList.remove('hidden');
+            if (nameEl) nameEl.textContent = `${file.name} (${Math.round(currentCatImageData.length / 1024)} KB)`;
+            if (btnText) btnText.textContent = 'Cambiar Foto';
+            if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearCatImage() {
+    currentCatImageData = '';
+    const fileInput = document.getElementById('cat-img-file');
+    if (fileInput) fileInput.value = '';
+    const preview = document.getElementById('cat-img-preview');
+    const placeholder = document.getElementById('cat-img-placeholder-icon');
+    const clearBtn = document.getElementById('cat-img-clear-btn');
+    const nameEl = document.getElementById('cat-img-filename');
+    const btnText = document.getElementById('cat-img-btn-text');
+
+    if (preview) { preview.src = ''; preview.classList.add('hidden'); }
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (nameEl) nameEl.textContent = 'JPG, PNG o WebP desde cámara o galería';
+    if (btnText) btnText.textContent = 'Subir Foto';
+}
+
 async function addProduct(){
     if(!hasPermission('catalog.edit')){
         showAccessDeniedModal('Solo el Administrador tiene autorización para dar de alta nuevos productos en el catálogo.');
@@ -1133,7 +1203,8 @@ async function addProduct(){
     const stockInput=parseInt(document.getElementById('cat-stock').value);
     if(!name||isNaN(price)||isNaN(cost)){alert('Completa los campos de nombre, precio y costo.');return;}
     const stock = isNaN(stockInput) || stockInput < 0 ? 0 : stockInput;
-    const newProd = {id:'p_'+Date.now(),name,price,cost,stock,category:'General',created:new Date().toISOString()};
+    const image = currentCatImageData || '';
+    const newProd = {id:'p_'+Date.now(),name,price,cost,stock,image,category:'General',created:new Date().toISOString()};
     catalog.push(newProd);
     if (window.FirebaseService && window.FirebaseService.products) {
         await window.FirebaseService.products.save(newProd);
@@ -1141,6 +1212,7 @@ async function addProduct(){
     logActivity('Producto Creado', `Producto "${name}" agregado al catálogo en Firestore ($${price})`, 'success');
     document.getElementById('cat-name').value='';document.getElementById('cat-price').value='';document.getElementById('cat-cost').value='';
     document.getElementById('cat-stock').value='20';
+    clearCatImage();
     renderCatalog();
     updateProductSelect();
     showGlobalToast(`✓ Producto "${name}" guardado en Cloud Firestore`, 'success');
@@ -1162,6 +1234,173 @@ async function removeProduct(id){
         updateProductSelect();
         showGlobalToast(`✓ Producto eliminado de Cloud Firestore.`, 'info');
     }
+}
+
+// ===== EDICIÓN DE PRODUCTOS EXISTENTES (NOMBRE, PRECIO, COSTO, STOCK Y FOTO) =====
+let currentEditProductImageData = '';
+
+function openEditProductModal(id){
+    if(!hasPermission('catalog.edit')){
+        showAccessDeniedModal('Solo el Administrador tiene autorización para editar productos del catálogo.');
+        return;
+    }
+    const prod = catalog.find(p => p.id === id);
+    if(!prod){
+        alert('Producto no encontrado.');
+        return;
+    }
+
+    document.getElementById('edit-prod-id').value = prod.id;
+    const disp = document.getElementById('edit-prod-id-display');
+    if(disp) disp.textContent = prod.id;
+    document.getElementById('edit-prod-name').value = prod.name || '';
+    document.getElementById('edit-prod-price').value = prod.price !== undefined ? prod.price : '';
+    document.getElementById('edit-prod-cost').value = prod.cost !== undefined ? prod.cost : '';
+    document.getElementById('edit-prod-stock').value = prod.stock !== undefined ? prod.stock : 0;
+
+    // Foto actual
+    const currentImg = resolveProductImage(prod);
+    currentEditProductImageData = currentImg || '';
+
+    const preview = document.getElementById('edit-prod-img-preview');
+    const placeholder = document.getElementById('edit-prod-img-placeholder');
+    const clearBtn = document.getElementById('edit-prod-img-clear-btn');
+    const nameEl = document.getElementById('edit-prod-img-filename');
+    const btnText = document.getElementById('edit-prod-img-btn-text');
+    const fileInput = document.getElementById('edit-prod-img-file');
+    if(fileInput) fileInput.value = '';
+
+    if(currentImg){
+        if(preview) { preview.src = currentImg; preview.classList.remove('hidden'); }
+        if(placeholder) placeholder.classList.add('hidden');
+        if(clearBtn) clearBtn.classList.remove('hidden');
+        if(nameEl) nameEl.textContent = 'Foto actual del producto';
+        if(btnText) btnText.textContent = 'Cambiar Foto';
+    } else {
+        if(preview) { preview.src = ''; preview.classList.add('hidden'); }
+        if(placeholder) placeholder.classList.remove('hidden');
+        if(clearBtn) clearBtn.classList.add('hidden');
+        if(nameEl) nameEl.textContent = 'JPG, PNG o WebP desde cámara o galería';
+        if(btnText) btnText.textContent = 'Subir Foto';
+    }
+
+    const modal = document.getElementById('product-edit-modal');
+    if(modal) modal.classList.remove('hidden');
+    if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+function closeEditProductModal(){
+    const modal = document.getElementById('product-edit-modal');
+    if(modal) modal.classList.add('hidden');
+    currentEditProductImageData = '';
+    const fileInput = document.getElementById('edit-prod-img-file');
+    if(fileInput) fileInput.value = '';
+}
+
+function handleEditProductImageFile(input){
+    if(!input || !input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    if(!file.type.startsWith('image/')){
+        alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP).');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e){
+        const img = new Image();
+        img.onload = function(){
+            const maxDim = 480;
+            let w = img.width;
+            let h = img.height;
+            if(w > maxDim || h > maxDim){
+                if(w > h){
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            currentEditProductImageData = canvas.toDataURL('image/jpeg', 0.82);
+
+            const preview = document.getElementById('edit-prod-img-preview');
+            const placeholder = document.getElementById('edit-prod-img-placeholder');
+            const clearBtn = document.getElementById('edit-prod-img-clear-btn');
+            const nameEl = document.getElementById('edit-prod-img-filename');
+            const btnText = document.getElementById('edit-prod-img-btn-text');
+
+            if(preview){ preview.src = currentEditProductImageData; preview.classList.remove('hidden'); }
+            if(placeholder) placeholder.classList.add('hidden');
+            if(clearBtn) clearBtn.classList.remove('hidden');
+            if(nameEl) nameEl.textContent = `${file.name} (${Math.round(currentEditProductImageData.length / 1024)} KB)`;
+            if(btnText) btnText.textContent = 'Cambiar Foto';
+            if(window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearEditProductImage(){
+    currentEditProductImageData = '';
+    const fileInput = document.getElementById('edit-prod-img-file');
+    if(fileInput) fileInput.value = '';
+    const preview = document.getElementById('edit-prod-img-preview');
+    const placeholder = document.getElementById('edit-prod-img-placeholder');
+    const clearBtn = document.getElementById('edit-prod-img-clear-btn');
+    const nameEl = document.getElementById('edit-prod-img-filename');
+    const btnText = document.getElementById('edit-prod-img-btn-text');
+
+    if(preview){ preview.src = ''; preview.classList.add('hidden'); }
+    if(placeholder) placeholder.classList.remove('hidden');
+    if(clearBtn) clearBtn.classList.add('hidden');
+    if(nameEl) nameEl.textContent = 'Sin foto asignada';
+    if(btnText) btnText.textContent = 'Subir Foto';
+}
+
+async function saveEditProduct(){
+    if(!hasPermission('catalog.edit')){
+        showAccessDeniedModal('Solo el Administrador tiene autorización para editar productos del catálogo.');
+        return;
+    }
+    const id = document.getElementById('edit-prod-id').value;
+    const name = document.getElementById('edit-prod-name').value.trim();
+    const price = parseFloat(document.getElementById('edit-prod-price').value);
+    const cost = parseFloat(document.getElementById('edit-prod-cost').value);
+    const stockInput = parseInt(document.getElementById('edit-prod-stock').value);
+
+    if(!name || isNaN(price) || isNaN(cost)){
+        alert('Por favor completa los campos de nombre, precio y costo.');
+        return;
+    }
+    const stock = isNaN(stockInput) || stockInput < 0 ? 0 : stockInput;
+
+    const prodIndex = catalog.findIndex(p => p.id === id);
+    if(prodIndex === -1){
+        alert('Producto no encontrado en el catálogo.');
+        return;
+    }
+
+    const prod = catalog[prodIndex];
+    prod.name = name;
+    prod.price = price;
+    prod.cost = cost;
+    prod.stock = stock;
+    prod.image = currentEditProductImageData || '';
+
+    if (window.FirebaseService && window.FirebaseService.products) {
+        await window.FirebaseService.products.save(prod);
+    }
+
+    logActivity('Producto Editado', `Producto "${name}" actualizado (Precio: $${price}, Costo: $${cost}, Stock: ${stock})`, 'info');
+    closeEditProductModal();
+    renderCatalog();
+    updateProductSelect();
+    showGlobalToast(`✓ Producto "${name}" actualizado con éxito en Firestore`, 'success');
 }
 
 async function addStockToProduct(){
@@ -1227,53 +1466,58 @@ function renderCatalog(){
     document.getElementById('cat-list').innerHTML=catalog.map(p=>{
         const isOutOfStock = (p.stock || 0) <= 0;
         const isLowStock = !isOutOfStock && p.stock <= 5;
-        const categoryBadge = p.category ? `<span class="pill bg-slate-800 text-slate-300 border border-slate-700/60 font-medium text-[9px] shrink-0">${p.category}</span>` : '';
         const stockBadge = isOutOfStock
-            ? `<span class="pill bg-rose-500/20 text-rose-300 border border-rose-500/35 font-bold text-[9px] flex items-center gap-1 shrink-0"><i data-lucide="alert-octagon" class="w-2.5 h-2.5 text-rose-400"></i>AGOTADO (0 u.)</span>`
+            ? `<span class="pill bg-rose-500/20 text-rose-300 border border-rose-500/35 font-bold text-[8.5px] px-1.5 py-0.5 shrink-0 flex items-center gap-1"><i data-lucide="alert-octagon" class="w-2.5 h-2.5 text-rose-400"></i>0 u.</span>`
             : isLowStock
-            ? `<span class="pill bg-amber-500/20 text-amber-300 border border-amber-500/35 font-bold text-[9px] flex items-center gap-1 shrink-0"><i data-lucide="alert-triangle" class="w-2.5 h-2.5 text-amber-400"></i>Stock Bajo (${p.stock} u.)</span>`
-            : `<span class="pill bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[9px] flex items-center gap-1 shrink-0"><i data-lucide="boxes" class="w-2.5 h-2.5 text-emerald-400"></i>Stock: ${p.stock} u.</span>`;
+            ? `<span class="pill bg-amber-500/20 text-amber-300 border border-amber-500/35 font-bold text-[8.5px] px-1.5 py-0.5 shrink-0 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-2.5 h-2.5 text-amber-400"></i>${p.stock} u.</span>`
+            : `<span class="pill bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[8.5px] px-1.5 py-0.5 shrink-0 flex items-center gap-1"><i data-lucide="boxes" class="w-2.5 h-2.5 text-emerald-400"></i>${p.stock} u.</span>`;
 
         const financeInfo = canViewFinance
-            ? `Venta: ${fmt(p.price)} · Costo: ${fmt(p.cost)} · Margen: <span class="${((p.price-p.cost)/p.price*100)>30?'text-emerald-400':'text-amber-400'}">${((p.price-p.cost)/p.price*100).toFixed(0)}%</span>`
-            : `Precio de Venta: <span class="text-emerald-400 font-bold">${fmt(p.price)}</span>`;
-
-        const btnStock = canAdjustStock
-            ? `<button onclick="quickAddStock('${p.id}')" title="Reabastecer inventario" class="p-1 px-2 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-[10.5px] border border-indigo-500/30 flex items-center gap-1 transition shrink-0"><i data-lucide="plus" class="w-3 h-3"></i>Stock</button>`
-            : '';
+            ? `Venta: <b class="text-emerald-400 font-semibold">${fmt(p.price)}</b> · Costo: <b class="text-slate-300 font-normal">${fmt(p.cost)}</b> · Margen: <b class="${((p.price-p.cost)/p.price*100)>30?'text-emerald-400':'text-amber-400'} font-normal">${((p.price-p.cost)/p.price*100).toFixed(0)}%</b>`
+            : `Precio: <b class="text-emerald-400 font-semibold">${fmt(p.price)}</b>`;
 
         const canSell = hasPermission('pos.sell');
         const btnSell = (canSell && !isOutOfStock)
-            ? `<button onclick="quickSellProduct('${p.id}')" title="Vender este producto" class="p-1 px-2.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10.5px] border border-emerald-500/30 flex items-center gap-1 transition shrink-0"><i data-lucide="shopping-cart" class="w-3 h-3"></i>Vender</button>`
+            ? `<button onclick="quickSellProduct('${p.id}')" title="Vender este producto" class="pos-btn bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-1 px-2.5 rounded-lg shadow-sm flex items-center gap-1 shrink-0"><i data-lucide="shopping-cart" class="w-3 h-3"></i><span>Vender</span></button>`
+            : '';
+
+        const btnStock = canAdjustStock
+            ? `<button onclick="quickAddStock('${p.id}')" title="Reabastecer stock" class="p-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 transition shrink-0 flex items-center justify-center"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>`
+            : '';
+
+        const btnEdit = canEditCatalog
+            ? `<button onclick="openEditProductModal('${p.id}')" title="Editar producto, precios y foto" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition shrink-0 flex items-center justify-center"><i data-lucide="edit-3" class="w-3.5 h-3.5 text-sky-400"></i></button>`
             : '';
 
         const btnDelete = canDeleteCatalog
-            ? `<button onclick="removeProduct('${p.id}')" class="text-slate-600 hover:text-rose-400 transition p-1 shrink-0" title="Eliminar producto (Solo Administrador)"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`
+            ? `<button onclick="removeProduct('${p.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition shrink-0 flex items-center justify-center" title="Eliminar producto (Solo Administrador)"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>`
             : '';
 
         const imgSrc = resolveProductImage(p);
         const imgTag = imgSrc 
-            ? `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
-                   <img src="${imgSrc}" alt="${escapeHtml(p.name)}" loading="lazy" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i data-lucide=&quot;package&quot; class=&quot;w-5 h-5 text-slate-500&quot;></i>';">
+            ? `<div class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
+                   <img src="${imgSrc}" alt="${escapeHtml(p.name)}" loading="lazy" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i data-lucide=&quot;package&quot; class=&quot;w-4 h-4 text-slate-500&quot;></i>';">
                </div>`
-            : `<div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center text-slate-500"><i data-lucide="package" class="w-5 h-5"></i></div>`;
+            : `<div class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center text-slate-500"><i data-lucide="package" class="w-4 h-4"></i></div>`;
 
         return `
-        <div class="pos-row flex items-center gap-3">
+        <div class="pos-row flex items-center gap-2.5 py-2 px-3">
             ${imgTag}
             <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-                    <span class="text-sm font-semibold text-white truncate">${p.name}</span>
-                    ${categoryBadge}
+                <div class="flex items-center gap-1.5 leading-tight">
+                    <span class="text-xs sm:text-[13px] font-semibold text-white truncate" title="${escapeHtml(p.name)}">${p.name}</span>
                     ${stockBadge}
                 </div>
-                <div class="text-[11px] text-slate-400 mono">
+                <div class="text-[10px] text-slate-400 mono truncate mt-0.5">
                     ${financeInfo}
                 </div>
             </div>
-            ${btnSell}
-            ${btnStock}
-            ${btnDelete}
+            <div class="flex items-center gap-1 shrink-0">
+                ${btnSell}
+                ${btnStock}
+                ${btnEdit}
+                ${btnDelete}
+            </div>
         </div>`;
     }).join('');
     lucide.createIcons();
