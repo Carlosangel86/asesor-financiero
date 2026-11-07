@@ -554,10 +554,10 @@ async function printSaleTicket(saleId){
 
     const itemsHtml = sale.items.map(it => `
         <tr>
-            <td style="width:12%">${it.qty}</td>
-            <td style="width:58%">${it.name.substring(0, 20)}</td>
-            <td style="width:15%" class="tkt-right">${it.price.toFixed(2)}</td>
-            <td style="width:15%" class="tkt-right">${(it.qty * it.price).toFixed(2)}</td>
+            <td style="width:10%;text-align:left;vertical-align:top;">${it.qty}</td>
+            <td style="width:46%;text-align:left;vertical-align:top;word-break:break-word;">${(it.name || '').substring(0, 20)}</td>
+            <td style="width:22%;text-align:right;padding-right:8px;vertical-align:top;white-space:nowrap;" class="tkt-right">${it.price.toFixed(2)}</td>
+            <td style="width:22%;text-align:right;padding-left:6px;vertical-align:top;white-space:nowrap;" class="tkt-right">${(it.qty * it.price).toFixed(2)}</td>
         </tr>
     `).join('');
 
@@ -576,13 +576,13 @@ async function printSaleTicket(saleId){
         <div class="tkt-flex"><span>Fecha:</span><span>${formatAppDate(sale.date)}</span></div>
         <div class="tkt-flex"><span>Cajero:</span><span>@${sale.cashierUsername || 'caja'}</span></div>
         <div class="tkt-double-divider"></div>
-        <table class="tkt-table">
+        <table class="tkt-table" style="width:100%;table-layout:fixed;border-collapse:collapse;margin:4px 0;">
             <thead>
                 <tr>
-                    <th>Cant</th>
-                    <th>Descripción</th>
-                    <th class="tkt-right">P.U.</th>
-                    <th class="tkt-right">Imp</th>
+                    <th style="width:10%;text-align:left;">Cant</th>
+                    <th style="width:46%;text-align:left;">Descripción</th>
+                    <th style="width:22%;text-align:right;padding-right:8px;" class="tkt-right">P.U.</th>
+                    <th style="width:22%;text-align:right;padding-left:6px;" class="tkt-right">Imp</th>
                 </tr>
             </thead>
             <tbody>${itemsHtml}</tbody>
