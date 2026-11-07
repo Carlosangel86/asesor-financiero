@@ -386,6 +386,15 @@ async function askGemmaFiscal(activityText, R, S) {
     document.getElementById('typ').classList.remove('hidden');
     alog('Consultando recomendación fiscal');
     
+    const hypMatch = (activityText || '').toLowerCase().match(/(?:llegar\s+a\s+(?:las\s+)?ventas|meta\s+de\s+ventas|ventas\s+meta|proyecci[oó]n\s+de\s+ventas|si\s+(?:vendo|facturo|llego|mis\s+ventas))[^0-9$%]{0,25}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?/i);
+    let projectedNotice = '';
+    if(hypMatch){
+        const hypVal = normalizeMoneyToken(hypMatch[1], hypMatch[2]);
+        if(hypVal && hypVal !== S.rev){
+            projectedNotice = `\n- Ventas Proyectadas / Escenario consultado por el usuario: $${fmt(hypVal)}/mes ($${fmt(hypVal * 12)}/año) [Evalúa este nivel de ventas para tu recomendación fiscal sin asumir que ya las factura hoy]`;
+        }
+    }
+
     const salesInfo = S && S.rev ? `$${fmt(S.rev)}/mes ($${fmt(S.rev * 12)}/año)` : (S && S.target_sales ? `Ventas Meta de $${fmt(S.target_sales)}/mes` : 'No especificado aún');
     const costsInfo = S && S.cost ? `$${fmt(S.cost)}/mes` : 'No especificado aún';
     const invInfo = S && S.initial_investment ? `$${fmt(S.initial_investment)}` : 'No especificada';
@@ -396,8 +405,8 @@ async function askGemmaFiscal(activityText, R, S) {
 El usuario necesita saber cuál es el régimen fiscal más conveniente para su negocio según sus actividades económicas.
 
 DATOS DEL NEGOCIO:
-- Actividades / Giro: "${currentActivity}"
-- Ventas estimadas / actuales: ${salesInfo}
+- Actividades / Giro / Consulta: "${currentActivity}"
+- Ventas Actuales Reales del Negocio: ${salesInfo}${projectedNotice}
 - Costos operativos: ${costsInfo}
 - Inversión inicial: ${invInfo}
 - Giro detectado: ${industryInfo}
@@ -590,11 +599,21 @@ function parse(txt){
         S.target_margin = parseFloat(tmMatch2[1]) / 100;
     }
 
-    // 5. Detección específica de Ventas / Ingresos Mensuales (S.rev) - Excluye "ventas meta" y soporta $130,000
+    // 5. Detección de Ventas Actuales (S.rev) vs Metas / Escenarios Hipotéticos
+    const isGoalOrHypotheticalSales = /(?:llegar\s+a\s+(?:las\s+)?ventas|quiero\s+llegar|para\s+llegar|alcanzar\s+(?:las\s+)?ventas|para\s+alcanzar|meta\s+de\s+ventas|ventas\s+meta|objetivo\s+de\s+ventas|proyecci[oó]n\s+de\s+ventas|aspir(?:o|ar|ando)\s+a\s+ventas|plane(?:o|ar|ando)\s+(?:vender|llegar)|pretend(?:o|er|iendo)\s+(?:vender|llegar)|si\s+(?:quiero|vendo|vendiera|vendi[eé]ramos|facturo|facturara|factur[aá]ramos|tuviera|tuviese|llego|llegara|alcanzo|alcanzara)|si\s+(?:mis\s+)?ventas\s+(?:fueran|fuesen|llegan|llegaran|suben|aumentan|alcanzan)|qu[eé]\s*pasa\s*si\s+(?:vendo|mis\s+ventas)|qu[eé]\s*(?:r[eé]gimen|estrategia|opini[oó]n|me\s*recomiendas).*?si\s+(?:vendo|quiero|llego))/i.test(lo);
+
     if(!isStressScenario){
-        const revMatch = lo.match(/(?:facturando\s+ventas(?:\s+por|\s+de)?|ventas?(?!\s+meta)(?:\s+mensuales|\s+actuales|\s+totales|\s+de|\s+por|\s+son(?:\s+de)?|\s+ascienden\s+a)?|ingresos?(?:\s+mensuales|\s+actuales|\s+son(?:\s+de)?|\s+de|\s+por)?|vendo|vendemos|facturo|facturamos)[^0-9$%]{0,30}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?(?!\s*%)/i);
-        if(revMatch){
-            S.rev = normalizeMoneyToken(revMatch[1], revMatch[2]);
+        // A) Coincidencia directa para ventas ACTUALES reales explícitas (facturando ventas por $X, ventas actuales de $X, etc.)
+        const explicitActualRevMatch = lo.match(/(?:facturando\s+ventas(?:\s+actuales)?(?:\s+por|\s+de)?|ventas\s+actuales(?:\s+son(?:\s+de)?|\s+de|\s+por|\s+ascienden\s+a)?|actualmente\s+(?:vendo|facturo|tengo\s+ventas\s+(?:de|por)?)|vendo\s+actualmente|facturo\s+actualmente|mis\s+ventas\s+actuales\s+(?:son|de|ascienden\s+a))[^0-9$%]{0,25}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?(?!\s*%)/i);
+
+        if(explicitActualRevMatch){
+            S.rev = normalizeMoneyToken(explicitActualRevMatch[1], explicitActualRevMatch[2]);
+        } else if(!isGoalOrHypotheticalSales){
+            // B) Coincidencia general solo si la expresión NO denota una meta, deseo o condicional hipotético
+            const generalRevMatch = lo.match(/(?:(?:mis\s+)?ventas?(?!\s+meta)(?:\s+mensuales|\s+de|\s+por|\s+son(?:\s+de)?|\s+ascienden\s+a)?|(?:mis\s+)?ingresos?(?:\s+mensuales|\s+son(?:\s+de)?|\s+de|\s+por)?|vendo|vendemos|facturo|facturamos)[^0-9$%]{0,25}\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(millones|mill[oó]n(?:es)?|mill|mdp|mil|k)?(?!\s*%)/i);
+            if(generalRevMatch){
+                S.rev = normalizeMoneyToken(generalRevMatch[1], generalRevMatch[2]);
+            }
         }
     }
 
@@ -637,7 +656,7 @@ function parse(txt){
         const v = normalizeMoneyToken(rawToken, su);
         if(v !== null) nums.push({v,p:false});
     }
-    if(!isStressScenario && S.rev === null && lo.match(/vent|ingres|vend|factur/) && !invMatch){
+    if(!isStressScenario && !isGoalOrHypotheticalSales && S.rev === null && lo.match(/vent|ingres|vend|factur/) && !invMatch){
         const firstMoney = nums.find(n => !n.p);
         if(firstMoney) S.rev = firstMoney.v;
     }
