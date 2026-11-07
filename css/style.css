@@ -1,3 +1,10 @@
+html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
 :root {
     /* ===== SISTEMA DE DISEÑO BLACKMORPHISM / OBSIDIAN GLASS ===== */
     --app-background: #02040a;
@@ -34,6 +41,7 @@ body {
     color: #f8fafc;
     margin: 0;
     overflow: hidden;
+    height: 100%;
     height: 100vh;
     height: 100dvh;
     position: relative;
@@ -912,7 +920,7 @@ input:checked + .slider:before{transform:translateX(14px)}
 
 /* ===== OPTIMIZACIONES RESPONSIVAS PARA DISPOSITIVOS MÓVILES (< 1024px) ===== */
 @media (max-width: 1023px) {
-    /* Las columnas en móvil ocupan el ancho completo y confinan el scroll */
+    /* Las columnas en móvil ocupan el espacio exacto disponible sin desbordar */
     #pos-col-left,
     #pos-col-right,
     #adv-col-chat,
@@ -922,7 +930,8 @@ input:checked + .slider:before{transform:translateX(14px)}
         max-width: 100vw !important;
         flex: 1 1 0% !important;
         min-height: 0 !important;
-        height: 100% !important;
+        height: auto !important;
+        max-height: 100% !important;
         overflow: hidden !important;
         border-right: none !important;
     }
@@ -943,7 +952,7 @@ input:checked + .slider:before{transform:translateX(14px)}
         touch-action: pan-y !important;
     }
 
-    /* Padding más cómodo y compacto en pantallas táctiles */
+    /* Padding óptimo en pantallas táctiles con espacio inferior amplio para scroll completo */
     #v-dash,
     #v-ratios,
     #v-back,
@@ -952,12 +961,17 @@ input:checked + .slider:before{transform:translateX(14px)}
     #pv-sell,
     #pv-expense,
     #pv-users,
+    #pv-analista-info,
     #pos-panel-today,
     #pos-panel-stats,
     #pos-panel-almacen,
     #pos-panel-shifts,
     #pos-panel-invoices {
         padding: 12px 14px !important;
+        padding-bottom: max(100px, calc(80px + env(safe-area-inset-bottom, 24px))) !important;
+        min-height: 0 !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: contain !important;
     }
 
     /* Input text size en móvil para evitar zoom no deseado en iOS Safari */
